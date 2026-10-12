@@ -156,6 +156,7 @@ GLASS_DB = {
 
 PROCESSING_COSTS = {
     "tempering": 6.50,       # €/m²
+    "lami_processing": 7.00, # €/m² Laminated processing
     "rode": 1.20,            # €/τρέχον μέτρο
     "drilling": 2.50,        # €/τεμάχιο
     "double_spacer": 4.50,   # €/m²
@@ -171,10 +172,12 @@ STOCK_SHEETS = {
 }
 
 # ---------------------------------------------------------
-# SIDEBAR: DYNAMIC FISCAL INPUTS (DEFAULTS 45% & 20%)
+# SIDEBAR: DYNAMIC FISCAL INPUTS & EMPTY CUSTOMER DEFAULT
 # ---------------------------------------------------------
 st.sidebar.header("📋 Διαχείριση Παραγγελίας")
-customer_name = st.sidebar.text_input("Όνομα Project / Πελάτη", "ΜΑΡΤΙΝΟΣ ΓΕΩΡΓΙΟΣ ΑΝΤΩΝΙΟΣ")
+
+# COMPLETELY EMPTY CLIENT NAME DEFAULT
+customer_name = st.sidebar.text_input("Όνομα Project / Πελάτη", "")
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("⚙️ Δυναμικές Ρυθμίσεις Κοστολόγησης")
@@ -206,11 +209,13 @@ def calculate_recipe_cost(g1, g2, g3, is_double, is_triple, p1_opts, p2_opts, p3
     if g1 in GLASS_DB:
         direct_cost += GLASS_DB[g1]["cost"]
         if p1_opts.get("tempered"): direct_cost += PROCESSING_COSTS["tempering"]
+        if p1_opts.get("laminated"): direct_cost += PROCESSING_COSTS["lami_processing"]
     
     # Glass 2 (Double)
     if is_double and g2 in GLASS_DB:
         direct_cost += GLASS_DB[g2]["cost"]
         if p2_opts.get("tempered"): direct_cost += PROCESSING_COSTS["tempering"]
+        if p2_opts.get("laminated"): direct_cost += PROCESSING_COSTS["lami_processing"]
         direct_cost += PROCESSING_COSTS["double_spacer"] + PROCESSING_COSTS["argon"]
 
     # Glass 3 (Triple)
@@ -218,9 +223,11 @@ def calculate_recipe_cost(g1, g2, g3, is_double, is_triple, p1_opts, p2_opts, p3
         if g2 in GLASS_DB:
             direct_cost += GLASS_DB[g2]["cost"]
             if p2_opts.get("tempered"): direct_cost += PROCESSING_COSTS["tempering"]
+            if p2_opts.get("laminated"): direct_cost += PROCESSING_COSTS["lami_processing"]
         if g3 in GLASS_DB:
             direct_cost += GLASS_DB[g3]["cost"]
             if p3_opts.get("tempered"): direct_cost += PROCESSING_COSTS["tempering"]
+            if p3_opts.get("laminated"): direct_cost += PROCESSING_COSTS["lami_processing"]
         direct_cost += PROCESSING_COSTS["triple_spacer"] + (PROCESSING_COSTS["argon"] * 2)
 
     if add_pack:
@@ -299,6 +306,8 @@ def generate_pdf_offer(customer_name, df_items, df_summary, totals):
     
     story = []
 
+    cust_display = customer_name.upper() if customer_name.strip() else "-"
+
     # --- HEADER SECTION ---
     header_data = [
         [
@@ -306,7 +315,7 @@ def generate_pdf_offer(customer_name, df_items, df_summary, totals):
             Paragraph(f"<b>PAP SAFETY GLASS S.A.</b><br/>INDUSTRIAL AREA OF THESSALONIKI<br/>tel: +30 2310 796 180<br/>psg@papgroup.gr | www.papgroup.gr", normal_style)
         ],
         [
-            Paragraph(f"<b>CUSTOMER:</b> {customer_name.upper()}", subtitle_style),
+            Paragraph(f"<b>CUSTOMER:</b> {cust_display}", subtitle_style),
             Paragraph(f"<b>DATE:</b> {pd.Timestamp.now().strftime('%d/%m/%Y')}<br/><b>EST. DELIVERY DATE:</b> {pd.Timestamp.now().strftime('%d/%m/%Y')}", normal_style)
         ]
     ]
@@ -439,10 +448,12 @@ with tab1:
 
     col1, col2, col3 = st.columns(3)
     
+    p1_opts = {}
     with col1:
         st.subheader("🔵 Εξωτερικός Υαλοπίνακας (Γ1)")
         g1 = st.selectbox("Επιλογή Γυαλιού 1", list(GLASS_DB.keys()), key="g1")
-        p1_temp = st.checkbox("Security / Tempered", key="p1_temp")
+        p1_opts['laminated'] = st.checkbox("Είναι Laminated / Συγκολλημένος", key="p1_lami")
+        p1_opts['tempered'] = st.checkbox("Security / Tempered", key="p1_temp")
         p1_rode = st.checkbox("Ροντέ / Τρόχισμα", key="p1_rode")
         
     p2_opts = {}
@@ -450,6 +461,7 @@ with tab1:
         with col2:
             st.subheader("🟢 Μεσαίος / Εσωτερικός (Γ2)")
             g2 = st.selectbox("Επιλογή Γυαλιού 2", list(GLASS_DB.keys()), key="g2")
+            p2_opts['laminated'] = st.checkbox("Είναι Laminated / Συγκολλημένος ", key="p2_lami")
             p2_opts['tempered'] = st.checkbox("Security / Tempered ", key="p2_temp")
 
     p3_opts = {}
@@ -457,6 +469,7 @@ with tab1:
         with col3:
             st.subheader("🔴 Εσωτερικός (Γ3)")
             g3 = st.selectbox("Επιλογή Γυαλιού 3", list(GLASS_DB.keys()), key="g3")
+            p3_opts['laminated'] = st.checkbox("Είναι Laminated / Συγκολλημένος  ", key="p3_lami")
             p3_opts['tempered'] = st.checkbox("Security / Tempered  ", key="p3_temp")
     else:
         g3 = None
@@ -466,17 +479,18 @@ with tab1:
     with col_opt1:
         add_pack = st.checkbox("Προσθήκη Συσκευασίας & Μεταφοράς (+€3.50 / m²)", value=True)
     with col_opt2:
+        # ACTIVE EDITABLE WASTE FIELD
         waste_pct_est = st.number_input("⚠️ Εκτιμώμενη Φθορά Υλικού (%) [Προαιρετικά]", min_value=0.0, max_value=50.0, value=0.0, step=1.0)
 
     direct_cost, price_m2 = calculate_recipe_cost(
         g1, g2 if is_double else None, g3 if is_triple else None,
-        is_double, is_triple, {'tempered': p1_temp}, p2_opts, p3_opts, add_pack, waste_pct_est
+        is_double, is_triple, p1_opts, p2_opts, p3_opts, add_pack, waste_pct_est
     )
 
     full_recipe_name = f"{g1}"
     if is_double: full_recipe_name += f" / Warm edge Spacer + Argon / {g2}"
     if is_triple: full_recipe_name += f" / Warm edge Spacer + Argon / {g3}"
-    if p1_temp or (is_double and p2_opts.get('tempered')): full_recipe_name += " Tempered [HST]"
+    if p1_opts.get('tempered') or (is_double and p2_opts.get('tempered')): full_recipe_name += " Tempered [HST]"
 
     st.markdown("---")
     st.markdown(f"### **Σύνθεση:** {full_recipe_name}")
@@ -606,12 +620,13 @@ with tab3:
         st.markdown("---")
         
         # GENERATE PDF OFFER
+        file_cust_name = customer_name.strip() if customer_name.strip() else "Customer"
         pdf_file = generate_pdf_offer(customer_name, df_processed, df_summary, totals_dict)
 
         st.download_button(
             label="📥 Λήψη Προσφοράς σε PDF (PSG OFFER)",
             data=pdf_file,
-            file_name=f"PSG_Offer_{customer_name}.pdf",
+            file_name=f"PSG_Offer_{file_cust_name}.pdf",
             mime="application/pdf",
             use_container_width=True
         )
