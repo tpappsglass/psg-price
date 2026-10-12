@@ -178,7 +178,10 @@ PROCESSING_COSTS = {
     "tempering": 6.50,
     "lami_processing": 7.00,
     "rode": 1.20,
-    "packing_transport": 3.50
+    "packing_transport": 3.50,
+    "hst": 15.00,         # €/m² ανά γυαλί
+    "silkscreen": 15.00,  # €/m² ανά γυαλί
+    "step": 15.00         # €/m² ανά σύνθεση
 }
 
 STOCK_SHEETS = {
@@ -213,33 +216,42 @@ def clean_recipe_name(full_name):
     clean = full_name.split(" (")[0]
     return clean.strip()
 
-def calculate_single_glass_cost(g_main, g_extra, is_lami, pvb_type, temp_main, temp_extra, is_rode):
+def calculate_lami_component_cost(glasses_list, pvbs_list, temp_list, hst_list, silk_list, is_rode):
+    """ Υπολογίζει το κόστος μιας συγκολλημένης σύνθεσης (Laminated 2, 3 ή 4 γυαλιών) """
     cost = 0.0
-    if g_main in GLASS_DB:
-        cost += GLASS_DB[g_main]["cost"]
+    num_glasses = len(glasses_list)
     
-    if temp_main:
-        cost += PROCESSING_COSTS["tempering"]
+    # 1. Base Glass Costs
+    for g in glasses_list:
+        if g in GLASS_DB:
+            cost += GLASS_DB[g]["cost"]
 
-    if is_lami:
-        cost += PROCESSING_COSTS["lami_processing"]
-        if g_extra in GLASS_DB:
-            cost += GLASS_DB[g_extra]["cost"]
-        if pvb_type in PVB_DB:
-            cost += PVB_DB[pvb_type]
-        if temp_extra:
-            cost += PROCESSING_COSTS["tempering"]
+    # 2. PVB Costs (num_glasses - 1)
+    for pvb in pvbs_list:
+        if pvb in PVB_DB:
+            cost += PVB_DB[pvb]
 
+    # 3. Processing Costs per Glass Pane
+    for temp in temp_list:
+        if temp: cost += PROCESSING_COSTS["tempering"]
+    for hst in hst_list:
+        if hst: cost += PROCESSING_COSTS["hst"]
+    for silk in silk_list:
+        if silk: cost += PROCESSING_COSTS["silkscreen"]
+
+    # 4. Lamination Processing Fee per additional layer
+    if num_glasses > 1:
+        cost += (num_glasses - 1) * PROCESSING_COSTS["lami_processing"]
+
+    # 5. Rode
     if is_rode:
         cost += PROCESSING_COSTS["rode"]
 
     return cost
 
 def run_nesting_optimization(items, stock_w, stock_h):
-    """ Αλγόριθμος Guillotine Nesting με τοποθέτηση συντεταγμένων (x, y) για διάγραμμα """
     stock_area = (stock_w / 1000.0) * (stock_h / 1000.0)
     
-    # Flatten items into individual pieces
     individual_pieces = []
     p_id = 1
     for item in items:
@@ -247,10 +259,9 @@ def run_nesting_optimization(items, stock_w, stock_h):
             individual_pieces.append({'id': p_id, 'w': item['w'], 'h': item['h']})
             p_id += 1
 
-    # Sort pieces descending by height then width
     individual_pieces.sort(key=lambda p: (p['h'], p['w']), reverse=True)
 
-    placed_sheets = [] # list of placed items per sheet
+    placed_sheets = []
     current_sheet_items = []
     
     curr_x, curr_y = 0, 0
@@ -259,19 +270,16 @@ def run_nesting_optimization(items, stock_w, stock_h):
     for p in individual_pieces:
         pw, ph = p['w'], p['h']
         
-        # Check if fits in current row
         if curr_x + pw <= stock_w and curr_y + ph <= stock_h:
             current_sheet_items.append({'id': p['id'], 'x': curr_x, 'y': curr_y, 'w': pw, 'h': ph})
             curr_x += pw
             max_row_h = max(max_row_h, ph)
-        # Move to next row
         elif curr_y + max_row_h + ph <= stock_h and pw <= stock_w:
             curr_y += max_row_h
             curr_x = 0
             max_row_h = ph
             current_sheet_items.append({'id': p['id'], 'x': curr_x, 'y': curr_y, 'w': pw, 'h': ph})
             curr_x += pw
-        # Open a new sheet
         else:
             placed_sheets.append(current_sheet_items)
             current_sheet_items = [{'id': p['id'], 'x': 0, 'y': 0, 'w': pw, 'h': ph}]
@@ -290,17 +298,14 @@ def run_nesting_optimization(items, stock_w, stock_h):
     return sheets_needed, round(waste_percentage, 1), round(total_used_area, 2), placed_sheets
 
 def create_nesting_diagram(placed_sheet_items, sheet_idx, stock_w, stock_h):
-    """ Δημιουργεί εικόνα Matplotlib με τη διάταξη κοπής του φύλλου """
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.set_xlim(0, stock_w)
     ax.set_ylim(0, stock_h)
     ax.set_aspect('equal')
     
-    # Draw Stock Sheet Background
     rect_stock = patches.Rectangle((0, 0), stock_w, stock_h, linewidth=2, edgecolor='#1A365D', facecolor='#E2E8F0')
     ax.add_patch(rect_stock)
 
-    # Colors for pieces
     colors_list = ['#2B6CB0', '#319795', '#D69E2E', '#DD6B20', '#805AD5', '#3182CE']
 
     for item in placed_sheet_items:
@@ -308,7 +313,6 @@ def create_nesting_diagram(placed_sheet_items, sheet_idx, stock_w, stock_h):
         rect = patches.Rectangle((item['x'], item['y']), item['w'], item['h'], linewidth=1.5, edgecolor='#1A365D', facecolor=c, alpha=0.85)
         ax.add_patch(rect)
         
-        # Add label
         cx = item['x'] + item['w'] / 2
         cy = item['y'] + item['h'] / 2
         label_text = f"#{item['id']}\n{int(item['w'])}x{int(item['h'])}"
@@ -543,7 +547,6 @@ def generate_pdf_nesting_report(customer_name, df_items, stock_w, stock_h, sheet
     story.append(t_nest)
     story.append(Spacer(1, 15))
 
-    # ADD VISUAL NESTING DIAGRAMS TO PDF
     story.append(Paragraph("<b>🎨 Οπτικά Σχεδιαγράμματα Κοπής (Cutting Layouts)</b>", bold_style))
     story.append(Spacer(1, 10))
 
@@ -560,6 +563,55 @@ def generate_pdf_nesting_report(customer_name, df_items, stock_w, stock_h, sheet
     doc.build(story, canvasmaker=NumberedCanvas)
     buffer.seek(0)
     return buffer
+
+# ---------------------------------------------------------
+# HELPER UI BUILDER FOR UP TO 4 LAMINATED GLASSES
+# ---------------------------------------------------------
+def build_laminated_ui(pane_key_prefix, default_glass_key):
+    num_panes = st.selectbox("Αριθμός Φύλλων Laminated (Γυαλιών)", [2, 3, 4], index=0, key=f"{pane_key_prefix}_num_panes")
+    
+    glasses_list = []
+    pvbs_list = []
+    temp_list = []
+    hst_list = []
+    silk_list = []
+
+    # First Glass
+    st.markdown("---")
+    st.markdown("##### 📄 1ο Φύλλο Γυαλιού")
+    g1 = st.selectbox("Επιλογή 1ου Γυαλιού", list(GLASS_DB.keys()), key=f"{pane_key_prefix}_g1")
+    t1 = st.checkbox("Security (Tempered) 1ο Γυαλί", key=f"{pane_key_prefix}_t1")
+    h1 = st.checkbox("Heat Soak Test (HST) 1ο Γυαλί (+€15/m²)", key=f"{pane_key_prefix}_h1")
+    s1 = st.checkbox("Μεταξοτυπία 1ο Γυαλί (+€15/m²)", key=f"{pane_key_prefix}_s1")
+    glasses_list.append(g1)
+    temp_list.append(t1)
+    hst_list.append(h1)
+    silk_list.append(s1)
+
+    # Subsequent Glasses & PVBs
+    for i in range(2, num_panes + 1):
+        st.markdown(f"**🔗 1o/2o... Μεμβράνη PVB #{i-1}**")
+        pvb = st.selectbox(f"Επιλογή PVB #{i-1}", list(PVB_DB.keys()), key=f"{pane_key_prefix}_pvb_{i-1}")
+        pvbs_list.append(pvb)
+
+        st.markdown(f"##### 📄 {i}ο Φύλλο Γυαλιού")
+        g = st.selectbox(f"Επιλογή {i}ου Γυαλιού", list(GLASS_DB.keys()), key=f"{pane_key_prefix}_g{i}")
+        t = st.checkbox(f"Security (Tempered) {i}ο Γυαλί", key=f"{pane_key_prefix}_t{i}")
+        h = st.checkbox(f"Heat Soak Test (HST) {i}ο Γυαλί (+€15/m²)", key=f"{pane_key_prefix}_h{i}")
+        s = st.checkbox(f"Μεταξοτυπία {i}ο Γυαλί (+€15/m²)", key=f"{pane_key_prefix}_s{i}")
+        
+        glasses_list.append(g)
+        temp_list.append(t)
+        hst_list.append(h)
+        silk_list.append(s)
+
+    p_rode = st.checkbox("Ροντέ / Τρόχισμα (Laminated)", key=f"{pane_key_prefix}_rode")
+
+    # Name formulation
+    name = "+".join(glasses_list)
+    has_temp = any(temp_list)
+
+    return glasses_list, pvbs_list, temp_list, hst_list, silk_list, p_rode, name, has_temp
 
 # ---------------------------------------------------------
 # STREAMLIT UI & APPS
@@ -584,81 +636,103 @@ with tab1:
     col1, col2, col3 = st.columns(3)
     
     # GLASS 1 CONFIG
+    c1 = 0.0
+    name1 = ""
+    has_temp1 = False
+
     with col1:
         st.subheader("🔵 Εξωτερικός Υαλοπίνακας (Γ1)")
-        g1_main = st.selectbox("Επιλογή Βασικού Γυαλιού 1", list(GLASS_DB.keys()), key="g1_main")
         p1_lami = st.checkbox("Είναι Laminated / Συγκολλημένος", key="p1_lami")
         
-        g1_extra = None
-        pvb1_type = None
-        p1_temp_extra = False
-        
         if p1_lami:
-            st.markdown("**Σύνθεση Triplex / Laminated (Γ1):**")
-            g1_extra = st.selectbox("Επιλογή 2ου Γυαλιού (Γ1)", list(GLASS_DB.keys()), key="g1_extra")
-            pvb1_type = st.selectbox("Επιλογή Μεμβράνης PVB (Γ1)", list(PVB_DB.keys()), key="pvb1_type")
-            p1_temp_main = st.checkbox("Security 1ο Γυαλί (Γ1)", key="p1_temp_m")
-            p1_temp_extra = st.checkbox("Security 2ο Γυαλί (Γ1)", key="p1_temp_e")
+            st.markdown("**Σύνθεση Triplex / Laminated (έως 4 γυαλιά - Γ1):**")
+            g_list, pvb_list, t_list, h_list, s_list, rode, name1, has_temp1 = build_laminated_ui("g1", "CLEAR FLOAT GLASS 4 mm")
+            c1 = calculate_lami_component_cost(g_list, pvb_list, t_list, h_list, s_list, rode)
         else:
+            g1_main = st.selectbox("Επιλογή Βασικού Γυαλιού 1", list(GLASS_DB.keys()), key="g1_main")
             p1_temp_main = st.checkbox("Security / Tempered", key="p1_temp_m")
+            p1_hst_main = st.checkbox("Heat Soak Test (HST) (+€15/m²)", key="p1_hst_m")
+            p1_silk_main = st.checkbox("Μεταξοτυπία (+€15/m²)", key="p1_silk_m")
+            p1_rode = st.checkbox("Ροντέ / Τρόχισμα", key="p1_rode")
 
-        p1_rode = st.checkbox("Ροντέ / Τρόχισμα", key="p1_rode")
+            name1 = g1_main
+            has_temp1 = p1_temp_main
+            c1 = calculate_lami_component_cost([g1_main], [], [p1_temp_main], [p1_hst_main], [p1_silk_main], p1_rode)
 
     # GLASS 2 CONFIG
-    g2_main, g2_extra, pvb2_type, p2_lami, p2_temp_main, p2_temp_extra, p2_rode = None, None, None, False, False, False, False
+    c2 = 0.0
+    name2 = ""
+    has_temp2 = False
+
     if is_double:
         with col2:
             st.subheader("🟢 Μεσαίος / Εσωτερικός (Γ2)")
-            g2_main = st.selectbox("Επιλογή Βασικού Γυαλιού 2", list(GLASS_DB.keys()), key="g2_main")
             p2_lami = st.checkbox("Είναι Laminated / Συγκολλημένος ", key="p2_lami")
             if p2_lami:
-                st.markdown("**Σύνθεση Triplex / Laminated (Γ2):**")
-                g2_extra = st.selectbox("Επιλογή 2ου Γυαλιού (Γ2)", list(GLASS_DB.keys()), key="g2_extra")
-                pvb2_type = st.selectbox("Επιλογή Μεμβράνης PVB (Γ2)", list(PVB_DB.keys()), key="pvb2_type")
-                p2_temp_main = st.checkbox("Security 1ο Γυαλί (Γ2)", key="p2_temp_m")
-                p2_temp_extra = st.checkbox("Security 2ο Γυαλί (Γ2)", key="p2_temp_e")
+                st.markdown("**Σύνθεση Triplex / Laminated (έως 4 γυαλιά - Γ2):**")
+                g_list, pvb_list, t_list, h_list, s_list, rode, name2, has_temp2 = build_laminated_ui("g2", "CLEAR FLOAT GLASS 4 mm")
+                c2 = calculate_lami_component_cost(g_list, pvb_list, t_list, h_list, s_list, rode)
             else:
+                g2_main = st.selectbox("Επιλογή Βασικού Γυαλιού 2", list(GLASS_DB.keys()), key="g2_main")
                 p2_temp_main = st.checkbox("Security / Tempered ", key="p2_temp_m")
-            p2_rode = st.checkbox("Ροντέ / Τρόχισμα ", key="p2_rode")
+                p2_hst_main = st.checkbox("Heat Soak Test (HST) (+€15/m²) ", key="p2_hst_m")
+                p2_silk_main = st.checkbox("Μεταξοτυπία (+€15/m²) ", key="p2_silk_m")
+                p2_rode = st.checkbox("Ροντέ / Τρόχισμα ", key="p2_rode")
+
+                name2 = g2_main
+                has_temp2 = p2_temp_main
+                c2 = calculate_lami_component_cost([g2_main], [], [p2_temp_main], [p2_hst_main], [p2_silk_main], p2_rode)
 
     # GLASS 3 CONFIG
-    g3_main, g3_extra, pvb3_type, p3_lami, p3_temp_main, p3_temp_extra, p3_rode = None, None, None, False, False, False, False
+    c3 = 0.0
+    name3 = ""
+    has_temp3 = False
+
     if is_triple:
         with col3:
             st.subheader("🔴 Εσωτερικός (Γ3)")
-            g3_main = st.selectbox("Επιλογή Βασικού Γυαλιού 3", list(GLASS_DB.keys()), key="g3_main")
             p3_lami = st.checkbox("Είναι Laminated / Συγκολλημένος  ", key="p3_lami")
             if p3_lami:
-                st.markdown("**Σύνθεση Triplex / Laminated (Γ3):**")
-                g3_extra = st.selectbox("Επιλογή 2ου Γυαλιού (Γ3)", list(GLASS_DB.keys()), key="g3_extra")
-                pvb3_type = st.selectbox("Επιλογή Μεμβράνης PVB (Γ3)", list(PVB_DB.keys()), key="pvb3_type")
-                p3_temp_main = st.checkbox("Security 1ο Γυαλί (Γ3)", key="p3_temp_m")
-                p3_temp_extra = st.checkbox("Security 2ο Γυαλί (Γ3)", key="p3_temp_e")
+                st.markdown("**Σύνθεση Triplex / Laminated (έως 4 γυαλιά - Γ3):**")
+                g_list, pvb_list, t_list, h_list, s_list, rode, name3, has_temp3 = build_laminated_ui("g3", "CLEAR FLOAT GLASS 4 mm")
+                c3 = calculate_lami_component_cost(g_list, pvb_list, t_list, h_list, s_list, rode)
             else:
+                g3_main = st.selectbox("Επιλογή Βασικού Γυαλιού 3", list(GLASS_DB.keys()), key="g3_main")
                 p3_temp_main = st.checkbox("Security / Tempered  ", key="p3_temp_m")
-            p3_rode = st.checkbox("Ροντέ / Τρόχισμα  ", key="p3_rode")
+                p3_hst_main = st.checkbox("Heat Soak Test (HST) (+€15/m²)  ", key="p3_hst_m")
+                p3_silk_main = st.checkbox("Μεταξοτυπία (+€15/m²)  ", key="p3_silk_m")
+                p3_rode = st.checkbox("Ροντέ / Τρόχισμα  ", key="p3_rode")
 
-    # SPACERS & AIR GAPS CONFIG
+                name3 = g3_main
+                has_temp3 = p3_temp_main
+                c3 = calculate_lami_component_cost([g3_main], [], [p3_temp_main], [p3_hst_main], [p3_silk_main], p3_rode)
+
+    # SPACERS, STEP & AIR GAPS CONFIG
     total_spacer_cost = 0.0
     spacer_desc = ""
+    add_step = False
 
     if is_double and not is_triple:
         st.markdown("---")
-        st.subheader("🔲 Ρυθμίσεις Διάκενου / Αποστάτη (Spacer)")
-        col_sp1, col_sp2 = st.columns(2)
+        st.subheader("🔲 Ρυθμίσεις Διάκενου / Αποστάτη (Spacer) & Step")
+        col_sp1, col_sp2, col_sp3 = st.columns(3)
         with col_sp1:
             sp1_mat = st.selectbox("Υλικό Διάκενου", ["Technoform Warm Edge", "Aluminium"], key="sp1_mat")
         with col_sp2:
             sp1_size = st.selectbox("Πάχος Διάκενου (mm)", [10, 12, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32], index=4, key="sp1_size")
+        with col_sp3:
+            add_step = st.checkbox("Επεξεργασία STEP (+€15.00/m²)", key="add_step")
 
         key1 = f"{'Technoform' if 'Technoform' in sp1_mat else 'Aluminium'} {'< 18mm' if sp1_size < 18 else '> 18mm'}"
         total_spacer_cost = SPACER_PRICES.get(key1, 10.00)
+        if add_step:
+            total_spacer_cost += PROCESSING_COSTS["step"]
         spacer_desc = f" / {sp1_size}mm {sp1_mat} + Argon"
 
     elif is_triple:
         st.markdown("---")
-        st.subheader("🔲 Ρυθμίσεις Δύο Διάκενων / Αποστατών (Spacers)")
-        col_sp1, col_sp2 = st.columns(2)
+        st.subheader("🔲 Ρυθμίσεις Δύο Διάκενων / Αποστατών (Spacers) & Step")
+        col_sp1, col_sp2, col_sp3 = st.columns(3)
         with col_sp1:
             st.markdown("**1o Διάκενο (Γ1 - Γ2):**")
             sp1_mat = st.selectbox("Υλικό 1ου Διάκενου", ["Technoform Warm Edge", "Aluminium"], key="sp1_mat_trip")
@@ -669,9 +743,15 @@ with tab1:
             sp2_mat = st.selectbox("Υλικό 2ου Διάκενου", ["Technoform Warm Edge", "Aluminium"], key="sp2_mat_trip")
             sp2_size = st.selectbox("Πάχος 2ου Διάκενου (mm)", [10, 12, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32], index=4, key="sp2_size_trip")
 
+        with col_sp3:
+            st.markdown("**Ειδικές Επεξεργασίες Σύνθεσης:**")
+            add_step = st.checkbox("Επεξεργασία STEP (+€15.00/m²)", key="add_step_trip")
+
         key1 = f"{'Technoform' if 'Technoform' in sp1_mat else 'Aluminium'} {'< 18mm' if sp1_size < 18 else '> 18mm'}"
         key2 = f"{'Technoform' if 'Technoform' in sp2_mat else 'Aluminium'} {'< 18mm' if sp2_size < 18 else '> 18mm'}"
         total_spacer_cost = SPACER_PRICES.get(key1, 10.00) + SPACER_PRICES.get(key2, 10.00)
+        if add_step:
+            total_spacer_cost += PROCESSING_COSTS["step"]
         spacer_desc = f" / {sp1_size}mm {sp1_mat} + Argon"
 
     st.markdown("---")
@@ -682,10 +762,6 @@ with tab1:
         waste_pct_est = st.number_input("⚠️ Εκτιμώμενη Φθορά Υλικού (%) [Προαιρετικά]", min_value=0.0, max_value=50.0, value=0.0, step=1.0)
 
     # CALCULATE TOTAL DIRECT COST
-    c1 = calculate_single_glass_cost(g1_main, g1_extra, p1_lami, pvb1_type, p1_temp_main, p1_temp_extra, p1_rode)
-    c2 = calculate_single_glass_cost(g2_main, g2_extra, p2_lami, pvb2_type, p2_temp_main, p2_temp_extra, p2_rode) if is_double else 0.0
-    c3 = calculate_single_glass_cost(g3_main, g3_extra, p3_lami, pvb3_type, p3_temp_main, p3_temp_extra, p3_rode) if is_triple else 0.0
-
     direct_cost = c1 + c2 + c3 + total_spacer_cost
     if add_pack: direct_cost += PROCESSING_COSTS["packing_transport"]
     if waste_pct_est > 0: direct_cost *= (1.0 + (waste_pct_est / 100.0))
@@ -694,18 +770,17 @@ with tab1:
     final_price_m2 = cost_with_gbe + (cost_with_gbe * profit_markup)
 
     # FORMULATE RECIPE NAME
-    name1 = f"{g1_main}{'+' + g1_extra if p1_lami else ''}"
     full_recipe_name = name1
     if is_double and not is_triple:
-        name2 = f"{g2_main}{'+' + g2_extra if p2_lami else ''}"
         full_recipe_name += f"{spacer_desc} / {name2}"
     elif is_triple:
-        name2 = f"{g2_main}{'+' + g2_extra if p2_lami else ''}"
-        name3 = f"{g3_main}{'+' + g3_extra if p3_lami else ''}"
         full_recipe_name += f" / {sp1_size}mm {sp1_mat} + Argon / {name2} / {sp2_size}mm {sp2_mat} + Argon / {name3}"
 
-    if p1_temp_main or p1_temp_extra or p2_temp_main or p2_temp_extra or p3_temp_main or p3_temp_extra:
+    if has_temp1 or has_temp2 or has_temp3:
         full_recipe_name += " Tempered"
+
+    if add_step:
+        full_recipe_name += " [STEP]"
 
     st.markdown("---")
     st.markdown(f"### **Σύνθεση:** {full_recipe_name}")
@@ -800,7 +875,6 @@ with tab3:
 
         st.dataframe(df_processed, use_container_width=True)
 
-        # DISPLAY VISUAL NESTING DIAGRAMS ON SCREEN
         st.subheader("🎨 Οπτική Διάταξη Κοπών (Cutting Layouts)")
         for idx, sheet_items in enumerate(placed_sheets):
             img_buf = create_nesting_diagram(sheet_items, idx, stock_w, stock_h)
