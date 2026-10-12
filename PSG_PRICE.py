@@ -224,6 +224,8 @@ def calculate_single_glass_cost(g_main, g_extra, is_lami, pvb_type, is_temp, is_
             cost += PVB_DB[pvb_type]
     if is_temp:
         cost += PROCESSING_COSTS["tempering"]
+    if is_rode:
+        cost += PROCESSING_COSTS["rode"]
     return cost
 
 def run_nesting_optimization(items, stock_w, stock_h):
@@ -500,7 +502,7 @@ with tab1:
         p1_rode = st.checkbox("Ροντέ / Τρόχισμα", key="p1_rode")
 
     # GLASS 2 CONFIG
-    g2_main, g2_extra, pvb2_type, p2_temp, p2_rode = None, None, None, False, False
+    g2_main, g2_extra, pvb2_type, p2_lami, p2_temp, p2_rode = None, None, None, False, False, False
     if is_double:
         with col2:
             st.subheader("🟢 Μεσαίος / Εσωτερικός (Γ2)")
@@ -514,7 +516,7 @@ with tab1:
             p2_rode = st.checkbox("Ροντέ / Τρόχισμα ", key="p2_rode")
 
     # GLASS 3 CONFIG
-    g3_main, g3_extra, pvb3_type, p3_temp, p3_rode = None, None, None, False, False
+    g3_main, g3_extra, pvb3_type, p3_lami, p3_temp, p3_rode = None, None, None, False, False, False
     if is_triple:
         with col3:
             st.subheader("🔴 Εσωτερικός (Γ3)")
@@ -557,8 +559,8 @@ with tab1:
 
     # CALCULATE TOTAL DIRECT COST
     c1 = calculate_single_glass_cost(g1_main, g1_extra, p1_lami, pvb1_type, p1_temp, p1_rode)
-    c2 = calculate_single_glass_cost(g2_main, g2_extra, 'p2_lami' in locals() and p2_lami, pvb2_type, p2_temp, p2_rode) if is_double else 0.0
-    c3 = calculate_single_glass_cost(g3_main, g3_extra, 'p3_lami' in locals() and p3_lami, pvb3_type, p3_temp, p3_rode) if is_triple else 0.0
+    c2 = calculate_single_glass_cost(g2_main, g2_extra, p2_lami, pvb2_type, p2_temp, p2_rode) if is_double else 0.0
+    c3 = calculate_single_glass_cost(g3_main, g3_extra, p3_lami, pvb3_type, p3_temp, p3_rode) if is_triple else 0.0
 
     direct_cost = c1 + c2 + c3 + spacer_cost
     if add_pack: direct_cost += PROCESSING_COSTS["packing_transport"]
@@ -571,10 +573,10 @@ with tab1:
     name1 = f"{g1_main}{'+' + g1_extra if p1_lami else ''}"
     full_recipe_name = name1
     if is_double:
-        name2 = f"{g2_main}{'+' + g2_extra if 'p2_lami' in locals() and p2_lami else ''}"
+        name2 = f"{g2_main}{'+' + g2_extra if p2_lami else ''}"
         full_recipe_name += f"{spacer_desc} / {name2}"
     if is_triple:
-        name3 = f"{g3_main}{'+' + g3_extra if 'p3_lami' in locals() and p3_lami else ''}"
+        name3 = f"{g3_main}{'+' + g3_extra if p3_lami else ''}"
         full_recipe_name += f" / {name3}"
     if p1_temp or p2_temp or p3_temp:
         full_recipe_name += " Tempered [HST]"
