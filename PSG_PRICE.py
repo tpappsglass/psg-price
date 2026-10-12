@@ -16,15 +16,16 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 # ---------------------------------------------------------
-# REGISTER UNICODE GREEK FONT (Arial)
+# REGISTER UNICODE GREEK FONT (Arial Narrow)
 # ---------------------------------------------------------
 try:
-    # Διαβάζει τα αρχεία Arial από τον ίδιο φάκελο για σωστά Ελληνικά
-    pdfmetrics.registerFont(TTFont('Arial', 'arial.ttf'))
-    pdfmetrics.registerFont(TTFont('Arial-Bold', 'arialbd.ttf'))
+    # Διαβάζει ακριβώς τα αρχεία που ανέβηκαν στο GitHub
+    pdfmetrics.registerFont(TTFont('Arial', 'ARIALN.TTF'))
+    pdfmetrics.registerFont(TTFont('Arial-Bold', 'ARIALNB.TTF'))
     FONT_NAME = 'Arial'
     FONT_BOLD = 'Arial-Bold'
-except Exception:
+except Exception as e:
+    st.error(f"Σφάλμα φόρτωσης γραμματοσειράς: {e}")
     FONT_NAME = 'Helvetica'
     FONT_BOLD = 'Helvetica-Bold'
 
@@ -494,7 +495,6 @@ def generate_pdf_offer(customer_name, df_items, df_summary, totals, est_delivery
         ('BOTTOMPADDING', (0,0), (-1,-1), 2),
     ]))
 
-    # ΠΡΟΣΟΧΗ ΕΔΩ: Έγινε αντικατάσταση της κουκκίδας με παύλα (-) για αποφυγή SyntaxError
     bank_info = """
     <b>Προκαταβολή 40%:</b> Παρακαλούμε για την κατάθεση προκαταβολής 40% επί του συνολικού ποσού.<br/>
     Μετά την κατάθεση, αποστείλετε το αποδεικτικό με email για την άμεση δρομολόγηση της παραγωγής.<br/><br/>
