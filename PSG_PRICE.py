@@ -191,7 +191,7 @@ STOCK_SHEETS = {
 }
 
 # ---------------------------------------------------------
-# SIDEBAR: DYNAMIC FISCAL INPUTS
+# SIDEBAR: DYNAMIC FISCAL INPUTS (UPDATED DEFAULTS: 25% GBE / 15% PROFIT)
 # ---------------------------------------------------------
 st.sidebar.header("📋 Διαχείριση Παραγγελίας")
 customer_name = st.sidebar.text_input("Όνομα Project / Πελάτη", "")
@@ -199,8 +199,8 @@ customer_name = st.sidebar.text_input("Όνομα Project / Πελάτη", "")
 st.sidebar.markdown("---")
 st.sidebar.subheader("⚙️ Δυναμικές Ρυθμίσεις Κοστολόγησης")
 
-gbe_pct = st.sidebar.number_input("Γ.Β.Ε. / Έξοδα (%)", min_value=0.0, max_value=80.0, value=45.0, step=0.5)
-profit_pct = st.sidebar.number_input("Καθαρό Κέρδος (%)", min_value=0.0, max_value=80.0, value=20.0, step=0.5)
+gbe_pct = st.sidebar.number_input("Γ.Β.Ε. / Έξοδα (%)", min_value=0.0, max_value=80.0, value=25.0, step=0.5)
+profit_pct = st.sidebar.number_input("Καθαρό Κέρδος (%)", min_value=0.0, max_value=80.0, value=15.0, step=0.5)
 
 gbe_markup = gbe_pct / (100.0 - gbe_pct) if gbe_pct < 100 else 0
 profit_markup = profit_pct / (100.0 - profit_pct) if profit_pct < 100 else 0
@@ -217,21 +217,17 @@ def clean_recipe_name(full_name):
     return clean.strip()
 
 def calculate_lami_component_cost(glasses_list, pvbs_list, temp_list, hst_list, silk_list, is_rode):
-    """ Υπολογίζει το κόστος μιας συγκολλημένης σύνθεσης (Laminated 2, 3 ή 4 γυαλιών) """
     cost = 0.0
     num_glasses = len(glasses_list)
     
-    # 1. Base Glass Costs
     for g in glasses_list:
         if g in GLASS_DB:
             cost += GLASS_DB[g]["cost"]
 
-    # 2. PVB Costs (num_glasses - 1)
     for pvb in pvbs_list:
         if pvb in PVB_DB:
             cost += PVB_DB[pvb]
 
-    # 3. Processing Costs per Glass Pane
     for temp in temp_list:
         if temp: cost += PROCESSING_COSTS["tempering"]
     for hst in hst_list:
@@ -239,11 +235,9 @@ def calculate_lami_component_cost(glasses_list, pvbs_list, temp_list, hst_list, 
     for silk in silk_list:
         if silk: cost += PROCESSING_COSTS["silkscreen"]
 
-    # 4. Lamination Processing Fee per additional layer
     if num_glasses > 1:
         cost += (num_glasses - 1) * PROCESSING_COSTS["lami_processing"]
 
-    # 5. Rode
     if is_rode:
         cost += PROCESSING_COSTS["rode"]
 
@@ -576,7 +570,6 @@ def build_laminated_ui(pane_key_prefix, default_glass_key):
     hst_list = []
     silk_list = []
 
-    # First Glass
     st.markdown("---")
     st.markdown("##### 📄 1ο Φύλλο Γυαλιού")
     g1 = st.selectbox("Επιλογή 1ου Γυαλιού", list(GLASS_DB.keys()), key=f"{pane_key_prefix}_g1")
@@ -588,9 +581,8 @@ def build_laminated_ui(pane_key_prefix, default_glass_key):
     hst_list.append(h1)
     silk_list.append(s1)
 
-    # Subsequent Glasses & PVBs
     for i in range(2, num_panes + 1):
-        st.markdown(f"**🔗 1o/2o... Μεμβράνη PVB #{i-1}**")
+        st.markdown(f"**🔗 Μεμβράνη PVB #{i-1}**")
         pvb = st.selectbox(f"Επιλογή PVB #{i-1}", list(PVB_DB.keys()), key=f"{pane_key_prefix}_pvb_{i-1}")
         pvbs_list.append(pvb)
 
@@ -607,7 +599,6 @@ def build_laminated_ui(pane_key_prefix, default_glass_key):
 
     p_rode = st.checkbox("Ροντέ / Τρόχισμα (Laminated)", key=f"{pane_key_prefix}_rode")
 
-    # Name formulation
     name = "+".join(glasses_list)
     has_temp = any(temp_list)
 
