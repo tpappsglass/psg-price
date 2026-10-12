@@ -17,18 +17,6 @@ from reportlab.pdfgen import canvas
 st.set_page_config(page_title="PSG PRICE - Calumen & Nesting Offer Engine", layout="wide")
 
 # ---------------------------------------------------------
-# FIXED FISCAL CONSTANTS (LOCKED)
-# ---------------------------------------------------------
-FIXED_GBE_PCT = 45.0     # 45% Overhead (GOU/GBE)
-FIXED_PROFIT_PCT = 20.0  # 20% Net Profit Margin
-
-# Markups on direct cost:
-# GBE Markup = 45 / (100 - 45) = 81.8182%
-# Profit Markup = 20 / (100 - 20) = 25.0000%
-GBE_MARKUP = FIXED_GBE_PCT / (100.0 - FIXED_GBE_PCT)
-PROFIT_MARKUP = FIXED_PROFIT_PCT / (100.0 - FIXED_PROFIT_PCT)
-
-# ---------------------------------------------------------
 # EXTENDED GLASS DATABASE (132 GLASS TYPES FROM KOSTOLOGIO.XLSX)
 # ---------------------------------------------------------
 GLASS_DB = {
@@ -183,6 +171,25 @@ STOCK_SHEETS = {
 }
 
 # ---------------------------------------------------------
+# SIDEBAR: DYNAMIC FISCAL INPUTS (DEFAULTS 45% & 20%)
+# ---------------------------------------------------------
+st.sidebar.header("📋 Διαχείριση Παραγγελίας")
+customer_name = st.sidebar.text_input("Όνομα Project / Πελάτη", "ΜΑΡΤΙΝΟΣ ΓΕΩΡΓΙΟΣ ΑΝΤΩΝΙΟΣ")
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("⚙️ Δυναμικές Ρυθμίσεις Κοστολόγησης")
+
+# DYNAMIC MARGIN INPUTS WITH 45% & 20% DEFAULTS
+gbe_pct = st.sidebar.number_input("Γ.Β.Ε. / Έξοδα (%)", min_value=0.0, max_value=80.0, value=45.0, step=0.5)
+profit_pct = st.sidebar.number_input("Καθαρό Κέρδος (%)", min_value=0.0, max_value=80.0, value=20.0, step=0.5)
+
+# Dynamic Markup Calculations
+gbe_markup = gbe_pct / (100.0 - gbe_pct) if gbe_pct < 100 else 0
+profit_markup = profit_pct / (100.0 - profit_pct) if profit_pct < 100 else 0
+
+st.sidebar.info(f"💡 **Markups:**\n- ΓΒE: +{gbe_markup*100:.2f}%\n- Κέρδος: +{profit_markup*100:.2f}%")
+
+# ---------------------------------------------------------
 # HELPER FUNCTIONS & GUILLOTINE NESTING ALGORITHM
 # ---------------------------------------------------------
 def clean_recipe_name(full_name):
@@ -192,7 +199,7 @@ def clean_recipe_name(full_name):
     clean = full_name.split(" (")[0]
     return clean.strip()
 
-def calculate_recipe_cost(g1, g2, g3, is_double, is_triple, p1_opts, p2_opts, p3_opts, add_pack):
+def calculate_recipe_cost(g1, g2, g3, is_double, is_triple, p1_opts, p2_opts, p3_opts, add_pack, waste_pct_est):
     direct_cost = 0.0
     
     # Glass 1
@@ -219,16 +226,20 @@ def calculate_recipe_cost(g1, g2, g3, is_double, is_triple, p1_opts, p2_opts, p3
     if add_pack:
         direct_cost += PROCESSING_COSTS["packing_transport"]
 
-    # Fiscal Pricing Calculation with fixed markups
-    gbe_amount = direct_cost * GBE_MARKUP
+    # ADD ESTIMATED MATERIAL WASTE / ΦΘΟΡΑ (IF ANY)
+    if waste_pct_est > 0:
+        direct_cost *= (1.0 + (waste_pct_est / 100.0))
+
+    # Fiscal Pricing Calculation with dynamic markups
+    gbe_amount = direct_cost * gbe_markup
     cost_with_gbe = direct_cost + gbe_amount
-    profit_amount = cost_with_gbe * PROFIT_MARKUP
+    profit_amount = cost_with_gbe * profit_markup
     final_price_m2 = cost_with_gbe + profit_amount
 
     return round(direct_cost, 2), round(final_price_m2, 2)
 
 def run_nesting_optimization(items, stock_w, stock_h):
-    """ Αλγόριθμος Nesting Guillotine για υπολογισμό φύρας """
+    """ Αλγόριθμος Nesting Guillotine για υπολογισμό πραγματικής φύρας """
     stock_area = (stock_w / 1000.0) * (stock_h / 1000.0)
     total_used_area = 0.0
     
@@ -413,17 +424,8 @@ st.title("🧮 PSG PRICE - Calumen Style Configurator & Precision Nesting Engine
 if 'recipes' not in st.session_state:
     st.session_state.recipes = {}
 
-# SIDEBAR: CLIENT CONFIG & FISCAL INDICATORS
-st.sidebar.header("📋 Διαχείριση Παραγγελίας")
-customer_name = st.sidebar.text_input("Όνομα Project / Πελάτη", "ΜΑΡΤΙΝΟΣ ΓΕΩΡΓΙΟΣ ΑΝΤΩΝΙΟΣ")
-
-st.sidebar.markdown("---")
-st.sidebar.subheader("⚙️ Σταθερές Ρυθμίσεις Κόστους")
-st.sidebar.markdown(f"**Γ.Β.Ε. (%):** {FIXED_GBE_PCT}% (Μόνιμο)")
-st.sidebar.markdown(f"**Καθαρό Κέρδος (%):** {FIXED_PROFIT_PCT}% (Μόνιμο)")
-
 # TABS NAVIGATION
-tab1, tab2, tab3 = st.tabs(["🧪 Calumen Recipe Builder", "📚 Βιβλιοθήκη Συνταγών", "📊 Κοστολόγηση Παραγγελίας & Προσφορά PDF"])
+tab1, tab2, tab3 = st.tabs(["🧪 Calumen Recipe Builder", "📚 Βιβλιοθήκη Συνταγών", "📊 Κοστολόγηση Παραγωγής & Προσφορά PDF"])
 
 # ---------------------------------------------------------
 # TAB 1: CALUMEN RECIPE BUILDER
@@ -459,11 +461,16 @@ with tab1:
     else:
         g3 = None
 
-    add_pack = st.checkbox("Προσθήκη Συσκευασίας & Μεταφοράς (+€3.50 / m²)", value=True)
+    st.markdown("---")
+    col_opt1, col_opt2 = st.columns(2)
+    with col_opt1:
+        add_pack = st.checkbox("Προσθήκη Συσκευασίας & Μεταφοράς (+€3.50 / m²)", value=True)
+    with col_opt2:
+        waste_pct_est = st.number_input("⚠️ Εκτιμώμενη Φθορά Υλικού (%) [Προαιρετικά]", min_value=0.0, max_value=50.0, value=0.0, step=1.0)
 
     direct_cost, price_m2 = calculate_recipe_cost(
         g1, g2 if is_double else None, g3 if is_triple else None,
-        is_double, is_triple, {'tempered': p1_temp}, p2_opts, p3_opts, add_pack
+        is_double, is_triple, {'tempered': p1_temp}, p2_opts, p3_opts, add_pack, waste_pct_est
     )
 
     full_recipe_name = f"{g1}"
@@ -499,7 +506,7 @@ with tab3:
     selected_sheet_label = st.selectbox("📐 Επιλέξτε Διάσταση Αρχικού Φύλλου Κοπής (Stock Sheet):", list(STOCK_SHEETS.keys()))
     stock_w, stock_h = STOCK_SHEETS[selected_sheet_label]
 
-    available_recipes = list(st.session_state.recipes.keys()) if st.session_state.recipes else ["6+8.4 Clear Tempered / Warm edge Spacer + Argon / 8mm SN70/37 Tempered [HST]"]
+    available_recipes = list(st.session_state.recipes.keys()) if st.session_state.recipes else ["CLIMAX SELECT 33.1 / Warm edge Spacer + Argon / CLEAR FLOAT GLASS 4 mm Tempered [HST]"]
     
     default_data = pd.DataFrame([
         {"Επιλογή Συνταγής": available_recipes[0], "Πλάτος (mm)": 1086, "Ύψος (mm)": 473, "Τεμάχια": 1, "Σημειώσεις": ""},
@@ -556,14 +563,14 @@ with tab3:
     df_processed = pd.DataFrame(processed_items)
 
     if not df_processed.empty:
-        # RUN NESTING ALGORITHM
+        # RUN REAL NESTING ALGORITHM TO GET ACTUAL WASTE
         sheets_needed, waste_pct, total_m2 = run_nesting_optimization(nesting_items, stock_w, stock_h)
 
         st.subheader("📋 Επισκόπηση Υπολογισμών Παραγγελίας & Nesting Report")
         col_n1, col_n2, col_n3 = st.columns(3)
-        col_n1.metric("Συνολικά Καθαρά m²", f"{total_m2:.2f} m²")
+        col_n1.metric("Συνολικά Πραγματικά Καθαρά m²", f"{total_m2:.2f} m²")
         col_n2.metric("Φύλλα Κοπής (Stock Sheets)", f"{sheets_needed} τεμ")
-        col_n3.metric("Υπολογιζόμενη Φύρα (Waste)", f"{waste_pct}%")
+        col_n3.metric("Πραγματική Φύρα Κοπής (Waste)", f"{waste_pct}%")
 
         st.dataframe(df_processed, use_container_width=True)
 
