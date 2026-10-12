@@ -233,11 +233,9 @@ def calculate_recipe_cost(g1, g2, g3, is_double, is_triple, p1_opts, p2_opts, p3
     if add_pack:
         direct_cost += PROCESSING_COSTS["packing_transport"]
 
-    # ADD ESTIMATED MATERIAL WASTE / ΦΘΟΡΑ (IF ANY)
     if waste_pct_est > 0:
         direct_cost *= (1.0 + (waste_pct_est / 100.0))
 
-    # Fiscal Pricing Calculation with dynamic markups
     gbe_amount = direct_cost * gbe_markup
     cost_with_gbe = direct_cost + gbe_amount
     profit_amount = cost_with_gbe * profit_markup
@@ -255,14 +253,14 @@ def run_nesting_optimization(items, stock_w, stock_h):
         piece_area = (w / 1000.0) * (h / 1000.0)
         total_used_area += piece_area * qty
 
-    sheets_needed = max(1, math.ceil(total_used_area / (stock_area * 0.85))) # 85% efficiency estimation
+    sheets_needed = max(1, math.ceil(total_used_area / (stock_area * 0.85)))
     total_stock_area = sheets_needed * stock_area
     waste_percentage = max(0.0, ((total_stock_area - total_used_area) / total_stock_area) * 100.0)
 
     return sheets_needed, round(waste_percentage, 1), round(total_used_area, 2)
 
 # ---------------------------------------------------------
-# PDF GENERATION ENGINE (OSG / PSG OFFER FORMAT)
+# PDF 1: OFFER GENERATION ENGINE (PSG OFFER FORMAT)
 # ---------------------------------------------------------
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -308,7 +306,7 @@ def generate_pdf_offer(customer_name, df_items, df_summary, totals):
 
     cust_display = customer_name.upper() if customer_name.strip() else "-"
 
-    # --- HEADER SECTION ---
+    # HEADER SECTION
     header_data = [
         [
             Paragraph("<b>OSG INDUSTRIES</b><br/><font size=11 color='#2B6CB0'>PSG OFFER - ΠΡΟΣΦΟΡΑ</font>", title_style),
@@ -327,7 +325,7 @@ def generate_pdf_offer(customer_name, df_items, df_summary, totals):
     story.append(t_header)
     story.append(Spacer(1, 12))
 
-    # --- DETAILED ITEMS TABLE ---
+    # DETAILED ITEMS TABLE
     items_table_data = [[
         Paragraph("PRODUCT DESCRIPTION", header_cell),
         Paragraph("WIDTH", header_cell),
@@ -361,7 +359,7 @@ def generate_pdf_offer(customer_name, df_items, df_summary, totals):
     story.append(t_items)
     story.append(Spacer(1, 12))
 
-    # --- SUMMARY TABLE BY PRODUCT TYPE ---
+    # SUMMARY TABLE BY PRODUCT TYPE
     summary_table_data = [[
         Paragraph("PRODUCT DESCRIPTION", header_cell),
         Paragraph("QTY", header_cell),
@@ -391,7 +389,7 @@ def generate_pdf_offer(customer_name, df_items, df_summary, totals):
     story.append(t_summary)
     story.append(Spacer(1, 12))
 
-    # --- FINANCIAL TOTALS & BANK ACCOUNTS ---
+    # FINANCIAL TOTALS & BANK ACCOUNTS
     financial_data = [
         [Paragraph("<b>WITHOUT VAT:</b>", bold_style), Paragraph(f"<b>{totals['net']:.2f}€</b>", bold_style)],
         [Paragraph("<b>VAT (24%):</b>", bold_style), Paragraph(f"<b>{totals['vat']:.2f}€</b>", bold_style)],
@@ -426,6 +424,87 @@ def generate_pdf_offer(customer_name, df_items, df_summary, totals):
     return buffer
 
 # ---------------------------------------------------------
+# PDF 2: CUTTING & NESTING REPORT ENGINE (FOR FACTORY)
+# ---------------------------------------------------------
+def generate_pdf_nesting_report(customer_name, df_items, stock_w, stock_h, sheets_needed, waste_pct, total_m2):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        leftMargin=36, rightMargin=36, topMargin=36, bottomMargin=40
+    )
+    styles = getSampleStyleSheet()
+    
+    title_style = ParagraphStyle('DocTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=15, leading=17, textColor=colors.HexColor("#C53030"))
+    normal_style = ParagraphStyle('NormText', parent=styles['Normal'], fontName='Helvetica', fontSize=8, leading=10, textColor=colors.HexColor("#2D3748"))
+    bold_style = ParagraphStyle('BoldText', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, leading=11, textColor=colors.HexColor("#1A365D"))
+    header_cell = ParagraphStyle('HeaderCell', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.white, alignment=1)
+
+    story = []
+    cust_display = customer_name.upper() if customer_name.strip() else "-"
+
+    # HEADER
+    story.append(Paragraph("<b>PAP SAFETY GLASS S.A. - CUTTING & NESTING REPORT</b>", title_style))
+    story.append(Paragraph(f"<b>PROJECT / CUSTOMER:</b> {cust_display} | <b>DATE:</b> {pd.Timestamp.now().strftime('%d/%m/%Y %H:%M')}", normal_style))
+    story.append(Spacer(1, 10))
+
+    # SUMMARY BOX
+    summary_box_data = [
+        [Paragraph("<b>Stock Sheet Size:</b>", normal_style), Paragraph(f"{stock_w} x {stock_h} mm", bold_style)],
+        [Paragraph("<b>Total Stock Sheets Needed:</b>", normal_style), Paragraph(f"<b>{sheets_needed} τεμάχια</b>", bold_style)],
+        [Paragraph("<b>Total Net Surface Area:</b>", normal_style), Paragraph(f"<b>{total_m2:.2f} m²</b>", bold_style)],
+        [Paragraph("<b>Estimated Waste (Φύρα):</b>", normal_style), Paragraph(f"<b>{waste_pct}%</b>", bold_style)]
+    ]
+    t_box = Table(summary_box_data, colWidths=[180, 340])
+    t_box.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#FFF5F5")),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#FEB2B2")),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+    ]))
+    story.append(t_box)
+    story.append(Spacer(1, 15))
+
+    # DETAILED PIECES TO CUT TABLE
+    story.append(Paragraph("<b>📋 Αναλυτική Λίστα Τεμαχίων για Κοπή</b>", bold_style))
+    story.append(Spacer(1, 5))
+
+    nest_table_data = [[
+        Paragraph("#", header_cell),
+        Paragraph("DESCRIPTION / SYNTHESIS", header_cell),
+        Paragraph("WIDTH (mm)", header_cell),
+        Paragraph("HEIGHT (mm)", header_cell),
+        Paragraph("QTY", header_cell),
+        Paragraph("TOTAL m²", header_cell),
+        Paragraph("NOTES", header_cell)
+    ]]
+
+    for idx, row in df_items.iterrows():
+        nest_table_data.append([
+            Paragraph(str(idx + 1), normal_style),
+            Paragraph(str(row['Περιγραφή']), normal_style),
+            Paragraph(str(int(row['Πλάτος (mm)'])), normal_style),
+            Paragraph(str(int(row['Ύψος (mm)'])), normal_style),
+            Paragraph(str(int(row['Τεμάχια'])), normal_style),
+            Paragraph(f"{row['Σύνολο m²']:.2f}", normal_style),
+            Paragraph(str(row.get('Σημειώσεις', '')), normal_style)
+        ])
+
+    t_nest = Table(nest_table_data, colWidths=[20, 200, 60, 60, 40, 60, 80])
+    t_nest.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#9B2C2C")),
+        ('ALIGN', (0,1), (-1,-1), 'CENTER'),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#E2E8F0")),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor("#F7FAFC")]),
+        ('TOPPADDING', (0,0), (-1,-1), 3),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+    ]))
+    story.append(t_nest)
+
+    doc.build(story, canvasmaker=NumberedCanvas)
+    buffer.seek(0)
+    return buffer
+
+# ---------------------------------------------------------
 # STREAMLIT UI & APPS
 # ---------------------------------------------------------
 st.title("🧮 PSG PRICE - Calumen Style Configurator & Precision Nesting Engine")
@@ -454,7 +533,7 @@ with tab1:
         g1 = st.selectbox("Επιλογή Γυαλιού 1", list(GLASS_DB.keys()), key="g1")
         p1_opts['laminated'] = st.checkbox("Είναι Laminated / Συγκολλημένος", key="p1_lami")
         p1_opts['tempered'] = st.checkbox("Security / Tempered", key="p1_temp")
-        p1_rode = st.checkbox("Ροντέ / Τρόχισμα", key="p1_rode")
+        p1_opts['rode'] = st.checkbox("Ροντέ / Τρόχισμα", key="p1_rode")
         
     p2_opts = {}
     if is_double:
@@ -463,6 +542,7 @@ with tab1:
             g2 = st.selectbox("Επιλογή Γυαλιού 2", list(GLASS_DB.keys()), key="g2")
             p2_opts['laminated'] = st.checkbox("Είναι Laminated / Συγκολλημένος ", key="p2_lami")
             p2_opts['tempered'] = st.checkbox("Security / Tempered ", key="p2_temp")
+            p2_opts['rode'] = st.checkbox("Ροντέ / Τρόχισμα ", key="p2_rode")
 
     p3_opts = {}
     if is_triple:
@@ -471,6 +551,7 @@ with tab1:
             g3 = st.selectbox("Επιλογή Γυαλιού 3", list(GLASS_DB.keys()), key="g3")
             p3_opts['laminated'] = st.checkbox("Είναι Laminated / Συγκολλημένος  ", key="p3_lami")
             p3_opts['tempered'] = st.checkbox("Security / Tempered  ", key="p3_temp")
+            p3_opts['rode'] = st.checkbox("Ροντέ / Τρόχισμα  ", key="p3_rode")
     else:
         g3 = None
 
@@ -479,7 +560,6 @@ with tab1:
     with col_opt1:
         add_pack = st.checkbox("Προσθήκη Συσκευασίας & Μεταφοράς (+€3.50 / m²)", value=True)
     with col_opt2:
-        # ACTIVE EDITABLE WASTE FIELD
         waste_pct_est = st.number_input("⚠️ Εκτιμώμενη Φθορά Υλικού (%) [Προαιρετικά]", min_value=0.0, max_value=50.0, value=0.0, step=1.0)
 
     direct_cost, price_m2 = calculate_recipe_cost(
@@ -540,7 +620,6 @@ with tab3:
         use_container_width=True
     )
 
-    # PROCESS ITEMS SAFELY
     processed_items = []
     nesting_items = []
 
@@ -548,7 +627,6 @@ with tab3:
         recipe_full = str(row.get("Επιλογή Συνταγής", ""))
         clean_desc = clean_recipe_name(recipe_full)
         
-        # SAFE NUMERIC CONVERSION TO PREVENT VALUEERROR
         w_val = pd.to_numeric(row.get("Πλάτος (mm)"), errors="coerce")
         h_val = pd.to_numeric(row.get("Ύψος (mm)"), errors="coerce")
         q_val = pd.to_numeric(row.get("Τεμάχια"), errors="coerce")
@@ -577,7 +655,6 @@ with tab3:
     df_processed = pd.DataFrame(processed_items)
 
     if not df_processed.empty:
-        # RUN REAL NESTING ALGORITHM TO GET ACTUAL WASTE
         sheets_needed, waste_pct, total_m2 = run_nesting_optimization(nesting_items, stock_w, stock_h)
 
         st.subheader("📋 Επισκόπηση Υπολογισμών Παραγγελίας & Nesting Report")
@@ -588,7 +665,6 @@ with tab3:
 
         st.dataframe(df_processed, use_container_width=True)
 
-        # GROUPED SUMMARY BY PRODUCT TYPE
         df_summary = df_processed.groupby("Περιγραφή").agg({
             "Τεμάχια": "sum",
             "Σύνολο m²": "sum",
@@ -596,7 +672,6 @@ with tab3:
             "Σύνολο (€)": "sum"
         }).reset_index()
 
-        # FINANCIAL TOTALS
         net_total = df_processed["Σύνολο (€)"].sum()
         vat_amount = net_total * 0.24
         grand_total = net_total + vat_amount
@@ -609,7 +684,6 @@ with tab3:
             "advance": advance_payment
         }
 
-        # DISPLAY FINANCIALS
         st.markdown("---")
         col_f1, col_f2, col_f3, col_f4 = st.columns(4)
         col_f1.metric("Καθαρή Αξία", f"{net_total:.2f} €")
@@ -619,14 +693,27 @@ with tab3:
 
         st.markdown("---")
         
-        # GENERATE PDF OFFER
         file_cust_name = customer_name.strip() if customer_name.strip() else "Customer"
-        pdf_file = generate_pdf_offer(customer_name, df_processed, df_summary, totals_dict)
+        
+        pdf_offer = generate_pdf_offer(customer_name, df_processed, df_summary, totals_dict)
+        pdf_nesting = generate_pdf_nesting_report(customer_name, df_processed, stock_w, stock_h, sheets_needed, waste_pct, total_m2)
 
-        st.download_button(
-            label="📥 Λήψη Προσφοράς σε PDF (PSG OFFER)",
-            data=pdf_file,
-            file_name=f"PSG_Offer_{file_cust_name}.pdf",
-            mime="application/pdf",
-            use_container_width=True
-        )
+        col_btn1, col_btn2 = st.columns(2)
+        
+        with col_btn1:
+            st.download_button(
+                label="📄 Λήψη Προσφοράς σε PDF (PSG OFFER)",
+                data=pdf_offer,
+                file_name=f"PSG_Offer_{file_cust_name}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
+
+        with col_btn2:
+            st.download_button(
+                label="✂️ Λήψη Αναφοράς Κοπών & Nesting σε PDF",
+                data=pdf_nesting,
+                file_name=f"PSG_Nesting_Report_{file_cust_name}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
