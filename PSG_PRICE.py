@@ -273,6 +273,10 @@ def calculate_component_cost(glasses_list, pvbs_list, temp_list, hst_list, silk_
 
     return base_cost, extra_cost, any_tempered
 
+# ---------------------------------------------------------
+# ADVANCED PRO NESTING (Best Area Fit + Split Longer Axis)
+# Εστιάζει στη συμπίεση των μικρών κομματιών και αφήνει ΜΑΖΙΚΑ ρετάλια
+# ---------------------------------------------------------
 def run_guillotine_nesting(items, stock_w, stock_h):
     stock_area = (stock_w / 1000.0) * (stock_h / 1000.0)
     
@@ -283,7 +287,8 @@ def run_guillotine_nesting(items, stock_w, stock_h):
             individual_pieces.append({'id': p_id, 'w': item['w'], 'h': item['h']})
             p_id += 1
 
-    individual_pieces.sort(key=lambda p: (p['w'] * p['h'], max(p['w'], p['h'])), reverse=True)
+    # Βήμα 1: Ταξινόμηση - Απολύτως κρίσιμο! Βάζουμε ΠΡΩΤΑ τα μεγαλύτερα σε εμβαδόν 
+    individual_pieces.sort(key=lambda p: p['w'] * p['h'], reverse=True)
 
     placed_sheets = []
     free_rects_per_sheet = [] 
@@ -302,17 +307,21 @@ def run_guillotine_nesting(items, stock_w, stock_h):
         best_sheet = -1
         best_rect_idx = -1
         best_orientation = None
-        
-        best_y = float('inf')
-        best_x = float('inf')
+        best_score = float('inf')
 
+        # Βήμα 2: Αναζήτηση του καλύτερου ΚΕΝΟΥ (Best Area Fit)
         for s_idx, free_rects in enumerate(free_rects_per_sheet):
             for r_idx, fr in enumerate(free_rects):
                 for ow, oh in orientations:
                     if ow <= fr['w'] and oh <= fr['h']:
-                        if fr['y'] < best_y or (fr['y'] == best_y and fr['x'] < best_x):
-                            best_y = fr['y']
-                            best_x = fr['x']
+                        # BAF: Επιλέγει το κενό που είναι ίσα-ίσα για να μπει το μικρό κομμάτι,
+                        # αφήνοντας τα τεράστια καθαρά ρετάλια άθικτα!
+                        area_fit = fr['w'] * fr['h']
+                        # Tie-breaker: Μαζεύουμε τα κομμάτια προς τη μία γωνία (κάτω-αριστερά)
+                        score = area_fit + fr['x'] + fr['y']
+                        
+                        if score < best_score:
+                            best_score = score
                             best_sheet = s_idx
                             best_rect_idx = r_idx
                             best_orientation = (ow, oh)
@@ -320,17 +329,20 @@ def run_guillotine_nesting(items, stock_w, stock_h):
         if best_sheet != -1:
             fr = free_rects_per_sheet[best_sheet].pop(best_rect_idx)
             ow, oh = best_orientation
+            
             placed_sheets[best_sheet].append({'id': p['id'], 'x': fr['x'], 'y': fr['y'], 'w': ow, 'h': oh})
 
+            # Βήμα 3: Έξυπνο Κόψιμο (Split Longer Axis) - Ο ΠΥΡΗΝΑΣ ΓΙΑ ΜΕΓΑΛΑ ΡΕΤΑΛΙΑ
+            # Κόβουμε πάντα τον κενό χώρο με τρόπο που η ΜΕΓΑΛΥΤΕΡΗ διάσταση να παραμένει ΑΚΕΡΑΙΑ.
             w_leftover = fr['w'] - ow
             h_leftover = fr['h'] - oh
 
             if w_leftover > h_leftover:
-                rect_right = {'x': fr['x'] + ow, 'y': fr['y'], 'w': w_leftover, 'h': fr['h']}
-                rect_top = {'x': fr['x'], 'y': fr['y'] + oh, 'w': ow, 'h': h_leftover}
-            else:
                 rect_right = {'x': fr['x'] + ow, 'y': fr['y'], 'w': w_leftover, 'h': oh}
                 rect_top = {'x': fr['x'], 'y': fr['y'] + oh, 'w': fr['w'], 'h': h_leftover}
+            else:
+                rect_right = {'x': fr['x'] + ow, 'y': fr['y'], 'w': w_leftover, 'h': fr['h']}
+                rect_top = {'x': fr['x'], 'y': fr['y'] + oh, 'w': ow, 'h': h_leftover}
 
             if rect_right['w'] > 0 and rect_right['h'] > 0:
                 free_rects_per_sheet[best_sheet].append(rect_right)
@@ -338,6 +350,7 @@ def run_guillotine_nesting(items, stock_w, stock_h):
                 free_rects_per_sheet[best_sheet].append(rect_top)
 
         else:
+            # Άνοιγμα νέου φύλλου
             ow, oh = orientations[0]
             placed_sheets.append([{'id': p['id'], 'x': 0, 'y': 0, 'w': ow, 'h': oh}])
             
@@ -345,12 +358,13 @@ def run_guillotine_nesting(items, stock_w, stock_h):
             w_leftover = stock_w - ow
             h_leftover = stock_h - oh
 
+            # Ίδιος κανόνας: Το κενό που μένει στο νέο φύλλο πρέπει να είναι ένα τεράστιο Γ
             if w_leftover > h_leftover:
-                rect_right = {'x': ow, 'y': 0, 'w': w_leftover, 'h': stock_h}
-                rect_top = {'x': 0, 'y': oh, 'w': ow, 'h': h_leftover}
-            else:
                 rect_right = {'x': ow, 'y': 0, 'w': w_leftover, 'h': oh}
                 rect_top = {'x': 0, 'y': oh, 'w': stock_w, 'h': h_leftover}
+            else:
+                rect_right = {'x': ow, 'y': 0, 'w': w_leftover, 'h': stock_h}
+                rect_top = {'x': 0, 'y': oh, 'w': ow, 'h': h_leftover}
             
             if rect_right['w'] > 0 and rect_right['h'] > 0:
                 new_free.append(rect_right)
