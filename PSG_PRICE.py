@@ -24,7 +24,6 @@ try:
     FONT_NAME = 'Arial'
     FONT_BOLD = 'Arial-Bold'
 except Exception as e:
-    # Αν τρέχει τοπικά και έχει τα κλασικά αρχεία
     try:
         pdfmetrics.registerFont(TTFont('Arial', 'arial.ttf'))
         pdfmetrics.registerFont(TTFont('Arial-Bold', 'arialbd.ttf'))
@@ -198,18 +197,16 @@ SPACER_PRICES = {
 # ---------------------------------------------------------
 # PROCESSING COSTS (Base vs Flat Extras)
 # ---------------------------------------------------------
-# Base Costs (υπόκεινται σε markups)
 COST_TEMP = 6.50
 COST_LAMI_PROC = 7.00
 COST_RODE = 1.20
 COST_PACK = 3.50
-COST_HOLES = 2.50 # ανά φύλλο γυαλιού
+COST_HOLES = 2.50 
 
-# Flat Extra Costs (ΔΕΝ παίρνουν ΓΒΕ & Κέρδος - προστίθενται ατόφια στο τέλος)
 FLAT_HST = 15.00
 FLAT_SILKSCREEN = 15.00
 FLAT_STEP = 15.00
-FLAT_BONDING = 35.00 # Μόνο αν > 4m² ανά τεμάχιο
+FLAT_BONDING = 35.00 
 
 STOCK_SHEETS = {
     "6.000 x 3.210 mm (Jumbo - Προεπιλογή)": (6000, 3210),
@@ -247,7 +244,7 @@ def calculate_component_cost(glasses_list, pvbs_list, temp_list, hst_list, silk_
     num_glasses = len(glasses_list)
     
     any_tempered = any(temp_list)
-    is_rode = manual_rode or any_tempered # Το ροντέ είναι υποχρεωτικό αν υπάρχει Tempered!
+    is_rode = manual_rode or any_tempered 
 
     for g in glasses_list:
         if g in GLASS_DB:
@@ -263,7 +260,6 @@ def calculate_component_cost(glasses_list, pvbs_list, temp_list, hst_list, silk_
     for hole in holes_list:
         if hole: base_cost += COST_HOLES
 
-    # Προσθήκες "Ατόφιες"
     for hst in hst_list:
         if hst: extra_cost += FLAT_HST
     for silk in silk_list:
@@ -278,10 +274,6 @@ def calculate_component_cost(glasses_list, pvbs_list, temp_list, hst_list, silk_
     return base_cost, extra_cost, any_tempered
 
 def run_guillotine_nesting(items, stock_w, stock_h):
-    """
-    Advanced Guillotine 2D Bin Packing (Smart Rotation + Free Space Utilization)
-    Αντί να αφήνει το "νεκρό χώρο" άδειο, τον γεμίζει με μικρότερα κομμάτια!
-    """
     stock_area = (stock_w / 1000.0) * (stock_h / 1000.0)
     
     individual_pieces = []
@@ -291,8 +283,7 @@ def run_guillotine_nesting(items, stock_w, stock_h):
             individual_pieces.append({'id': p_id, 'w': item['w'], 'h': item['h']})
             p_id += 1
 
-    # Ταξινόμηση από το μεγαλύτερο στο μικρότερο (κρίσιμο για BSSF)
-    individual_pieces.sort(key=lambda p: (max(p['w'], p['h']), min(p['w'], p['h'])), reverse=True)
+    individual_pieces.sort(key=lambda p: (p['w'] * p['h'], max(p['w'], p['h'])), reverse=True)
 
     placed_sheets = []
     free_rects_per_sheet = [] 
@@ -306,38 +297,40 @@ def run_guillotine_nesting(items, stock_w, stock_h):
             orientations.append((h_p, w_p))
             
         if not orientations:
-            continue # Πολύ μεγάλο για το φύλλο
+            continue
 
         best_sheet = -1
         best_rect_idx = -1
         best_orientation = None
-        best_score = float('inf')
+        
+        best_y = float('inf')
+        best_x = float('inf')
 
-        # Ψάχνουμε το καλύτερο κενό (Best Short Side Fit)
         for s_idx, free_rects in enumerate(free_rects_per_sheet):
             for r_idx, fr in enumerate(free_rects):
                 for ow, oh in orientations:
                     if ow <= fr['w'] and oh <= fr['h']:
-                        score = min(fr['w'] - ow, fr['h'] - oh)
-                        if score < best_score:
-                            best_score = score
+                        if fr['y'] < best_y or (fr['y'] == best_y and fr['x'] < best_x):
+                            best_y = fr['y']
+                            best_x = fr['x']
                             best_sheet = s_idx
                             best_rect_idx = r_idx
                             best_orientation = (ow, oh)
 
         if best_sheet != -1:
-            # Τοποθέτηση σε Υπάρχον Φύλλο
             fr = free_rects_per_sheet[best_sheet].pop(best_rect_idx)
             ow, oh = best_orientation
             placed_sheets[best_sheet].append({'id': p['id'], 'x': fr['x'], 'y': fr['y'], 'w': ow, 'h': oh})
 
-            # Κόψιμο ελεύθερου χώρου (Guillotine Split)
-            if fr['w'] - ow > fr['h'] - oh:
-                rect_right = {'x': fr['x'] + ow, 'y': fr['y'], 'w': fr['w'] - ow, 'h': fr['h']}
-                rect_top = {'x': fr['x'], 'y': fr['y'] + oh, 'w': ow, 'h': fr['h'] - oh}
+            w_leftover = fr['w'] - ow
+            h_leftover = fr['h'] - oh
+
+            if w_leftover > h_leftover:
+                rect_right = {'x': fr['x'] + ow, 'y': fr['y'], 'w': w_leftover, 'h': fr['h']}
+                rect_top = {'x': fr['x'], 'y': fr['y'] + oh, 'w': ow, 'h': h_leftover}
             else:
-                rect_right = {'x': fr['x'] + ow, 'y': fr['y'], 'w': fr['w'] - ow, 'h': oh}
-                rect_top = {'x': fr['x'], 'y': fr['y'] + oh, 'w': fr['w'], 'h': fr['h'] - oh}
+                rect_right = {'x': fr['x'] + ow, 'y': fr['y'], 'w': w_leftover, 'h': oh}
+                rect_top = {'x': fr['x'], 'y': fr['y'] + oh, 'w': fr['w'], 'h': h_leftover}
 
             if rect_right['w'] > 0 and rect_right['h'] > 0:
                 free_rects_per_sheet[best_sheet].append(rect_right)
@@ -345,17 +338,19 @@ def run_guillotine_nesting(items, stock_w, stock_h):
                 free_rects_per_sheet[best_sheet].append(rect_top)
 
         else:
-            # Τοποθέτηση σε Νέο Φύλλο
             ow, oh = orientations[0]
             placed_sheets.append([{'id': p['id'], 'x': 0, 'y': 0, 'w': ow, 'h': oh}])
             
             new_free = []
-            if stock_w - ow > stock_h - oh:
-                rect_right = {'x': ow, 'y': 0, 'w': stock_w - ow, 'h': stock_h}
-                rect_top = {'x': 0, 'y': oh, 'w': ow, 'h': stock_h - oh}
+            w_leftover = stock_w - ow
+            h_leftover = stock_h - oh
+
+            if w_leftover > h_leftover:
+                rect_right = {'x': ow, 'y': 0, 'w': w_leftover, 'h': stock_h}
+                rect_top = {'x': 0, 'y': oh, 'w': ow, 'h': h_leftover}
             else:
-                rect_right = {'x': ow, 'y': 0, 'w': stock_w - ow, 'h': oh}
-                rect_top = {'x': 0, 'y': oh, 'w': stock_w, 'h': stock_h - oh}
+                rect_right = {'x': ow, 'y': 0, 'w': w_leftover, 'h': oh}
+                rect_top = {'x': 0, 'y': oh, 'w': stock_w, 'h': h_leftover}
             
             if rect_right['w'] > 0 and rect_right['h'] > 0:
                 new_free.append(rect_right)
@@ -684,7 +679,6 @@ def build_laminated_ui(pane_key_prefix, default_glass_key):
         silk_list.append(s)
         holes_list.append(hole)
 
-    # Αν υπάρχει έστω και ένα Tempered, το Ροντέ θα επιβάλλεται αυτόματα.
     any_temp = any(temp_list)
     rode_label = "Ροντέ / Τρόχισμα (Μπαίνει αυτόματα λόγω Tempered)" if any_temp else "Ροντέ / Τρόχισμα (Laminated)"
     p_rode = st.checkbox(rode_label, value=any_temp, disabled=any_temp, key=f"{pane_key_prefix}_rode")
@@ -717,11 +711,8 @@ with tab1:
 
     col1, col2, col3 = st.columns(3)
     
-    # GLASS 1 CONFIG
-    c1_base = 0.0
-    c1_extra = 0.0
+    c1_base, c1_extra, has_temp1 = 0.0, 0.0, False
     name1 = ""
-    has_temp1 = False
 
     with col1:
         st.subheader("🔵 Εξωτερικός Υαλοπίνακας (Γ1)")
@@ -745,11 +736,8 @@ with tab1:
             has_temp1 = p1_temp_main
             c1_base, c1_extra, _ = calculate_component_cost([g1_main], [], [p1_temp_main], [p1_hst_main], [p1_silk_main], [p1_holes_main], p1_rode)
 
-    # GLASS 2 CONFIG
-    c2_base = 0.0
-    c2_extra = 0.0
+    c2_base, c2_extra, has_temp2 = 0.0, 0.0, False
     name2 = ""
-    has_temp2 = False
 
     if is_double:
         with col2:
@@ -773,11 +761,8 @@ with tab1:
                 has_temp2 = p2_temp_main
                 c2_base, c2_extra, _ = calculate_component_cost([g2_main], [], [p2_temp_main], [p2_hst_main], [p2_silk_main], [p2_holes_main], p2_rode)
 
-    # GLASS 3 CONFIG
-    c3_base = 0.0
-    c3_extra = 0.0
+    c3_base, c3_extra, has_temp3 = 0.0, 0.0, False
     name3 = ""
-    has_temp3 = False
 
     if is_triple:
         with col3:
@@ -801,7 +786,6 @@ with tab1:
                 has_temp3 = p3_temp_main
                 c3_base, c3_extra, _ = calculate_component_cost([g3_main], [], [p3_temp_main], [p3_hst_main], [p3_silk_main], [p3_holes_main], p3_rode)
 
-    # SPACERS, STEP & AIR GAPS CONFIG
     total_spacer_cost = 0.0
     spacer_desc = ""
     add_step = False
@@ -848,24 +832,19 @@ with tab1:
     with col_opt3:
         waste_pct_est = st.number_input("⚠️ Εκτιμώμενη Φθορά Υλικού (%) [Προαιρετικά]", min_value=0.0, max_value=50.0, value=0.0, step=1.0)
 
-    # --- ΥΠΟΛΟΓΙΣΜΟΣ ΚΟΣΤΟΥΣ (BASE vs FLAT) ---
     base_direct_cost = c1_base + c2_base + c3_base + total_spacer_cost
     if add_pack: base_direct_cost += COST_PACK
     if waste_pct_est > 0: base_direct_cost *= (1.0 + (waste_pct_est / 100.0))
 
-    # Προσθέτουμε markups ΜΟΝΟ στο base_direct_cost
     base_with_gbe = base_direct_cost * (1 + gbe_markup)
     final_base_m2 = base_with_gbe * (1 + profit_markup)
 
-    # Υπολογισμός Extra Ατόφιων (χωρίς markups)
     total_flat_extras = c1_extra + c2_extra + c3_extra
     if add_step:
         total_flat_extras += FLAT_STEP
 
-    # Τελική βασική τιμή m2 (χωρίς το υποθετικό Bonding που εξαρτάται από μέγεθος)
     display_price_m2 = final_base_m2 + total_flat_extras
 
-    # FORMULATE RECIPE NAME
     full_recipe_name = name1
     if is_double and not is_triple:
         full_recipe_name += f"{spacer_desc} / {name2}"
@@ -920,7 +899,7 @@ with tab2:
             if isinstance(v, dict):
                 price = v["display"]
             else:
-                price = v # Legacy support for old numbers
+                price = v 
             display_data.append([k, f"{price:.2f} €"])
         
         df_rec = pd.DataFrame(display_data, columns=["Σύνθεση Υαλοστασίου", "Βασική Τιμή (€/m²)"])
@@ -979,14 +958,11 @@ with tab3:
             area_m2 = (w / 1000.0) * (h / 1000.0)
             total_area_m2 = area_m2 * qty
             
-            # Ανάκτηση δεδομένων συνταγής
             rec_val = st.session_state.recipes.get(recipe_full, {"base_m2": 165.0, "extras_m2": 0.0, "has_bonding": False})
             if isinstance(rec_val, (float, int)):
-                # Legacy format support
                 unit_price = rec_val
             else:
                 unit_price = rec_val["base_m2"] + rec_val["extras_m2"]
-                # Δυναμική προσθήκη Bonding +35€ ΜΟΝΟ αν τεμάχιο > 4 m2
                 if rec_val["has_bonding"] and area_m2 > 4.0:
                     unit_price += FLAT_BONDING
 
