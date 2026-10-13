@@ -274,7 +274,7 @@ def calculate_component_cost(glasses_list, pvbs_list, temp_list, hst_list, silk_
     return base_cost, extra_cost, any_tempered
 
 # ---------------------------------------------------------
-# INDUSTRIAL OPTIMA-STYLE NESTING (Strip Packing / Banding)
+# INDUSTRIAL OPTIMA-STYLE NESTING (Guillotine BSSF + MAXAS)
 # ---------------------------------------------------------
 def run_guillotine_nesting(items, stock_w, stock_h):
     stock_area = (stock_w / 1000.0) * (stock_h / 1000.0)
@@ -283,94 +283,108 @@ def run_guillotine_nesting(items, stock_w, stock_h):
     p_id = 1
     for item in items:
         for _ in range(item['qty']):
-            w, h = max(item['w'], item['h']), min(item['w'], item['h'])
-            individual_pieces.append({'id': p_id, 'w': w, 'h': h})
+            individual_pieces.append({'id': p_id, 'w': item['w'], 'h': item['h']})
             p_id += 1
 
-    individual_pieces.sort(key=lambda p: (p['h'], p['w']), reverse=True)
+    # Ταξινόμηση βάσει ΕΜΒΑΔΟΥ (φθίνουσα) και μετά βάσει μεγαλύτερης πλευράς
+    # Αυτό εξασφαλίζει ότι τα "σαλόνια" μπαίνουν πρώτα
+    individual_pieces.sort(key=lambda p: (p['w'] * p['h'], max(p['w'], p['h'])), reverse=True)
 
-    placed_sheets = []
-    current_sheet_items = []
-    current_sheet_y = 0
-    active_strips = [] 
-
+    sheets = []
+    
     for p in individual_pieces:
-        placed = False
-        p_w, p_h = p['w'], p['h']
-
-        orientations = [(p_w, p_h)]
-        if p_w != p_h:
-            orientations.append((p_h, p_w))
-
-        for ow, oh in orientations:
-            if placed: break
-            for strip in active_strips:
-                if strip['x_curr'] + ow <= strip['w_max'] and oh <= strip['h']:
-                    current_sheet_items.append({
-                        'id': p['id'], 
-                        'x': strip['x_curr'], 
-                        'y': strip['y'], 
-                        'w': ow, 
-                        'h': oh
-                    })
-                    strip['x_curr'] += ow 
-                    placed = True
-                    break
-
-        if not placed:
-            for ow, oh in orientations:
-                if placed: break
-                if current_sheet_y + oh <= stock_h and ow <= stock_w:
-                    new_strip = {
-                        'y': current_sheet_y,
-                        'h': oh, 
-                        'x_curr': ow,
-                        'w_max': stock_w
-                    }
-                    active_strips.append(new_strip)
-                    current_sheet_items.append({
-                        'id': p['id'], 
-                        'x': 0, 
-                        'y': current_sheet_y, 
-                        'w': ow, 
-                        'h': oh
-                    })
-                    current_sheet_y += oh 
-                    placed = True
-                    break
-
-        if not placed:
-            if current_sheet_items:
-                placed_sheets.append(current_sheet_items)
+        w_p, h_p = p['w'], p['h']
+        orientations = [(w_p, h_p)]
+        if w_p != h_p: orientations.append((h_p, w_p))
+        
+        best_sheet_idx = -1
+        best_rect_idx = -1
+        best_orientation = None
+        best_score_1 = float('inf') # Short side (BSSF)
+        best_score_2 = float('inf') # Long side
+        best_y = float('inf')
+        
+        # Σκανάρισμα όλων των κενών σε όλα τα φύλλα για ασφυκτικό στρίμωγμα
+        for s_idx, sheet in enumerate(sheets):
+            for r_idx, fr in enumerate(sheet['free_rects']):
+                for ow, oh in orientations:
+                    if ow <= fr['w'] and oh <= fr['h']:
+                        leftover_w = fr['w'] - ow
+                        leftover_h = fr['h'] - oh
+                        
+                        # Best Short Side Fit (BSSF)
+                        score_1 = min(leftover_w, leftover_h)
+                        score_2 = max(leftover_w, leftover_h)
+                        
+                        if score_1 < best_score_1 or \
+                           (score_1 == best_score_1 and score_2 < best_score_2) or \
+                           (score_1 == best_score_1 and score_2 == best_score_2 and fr['y'] < best_y):
+                            best_score_1 = score_1
+                            best_score_2 = score_2
+                            best_y = fr['y']
+                            best_sheet_idx = s_idx
+                            best_rect_idx = r_idx
+                            best_orientation = (ow, oh)
+                            
+        if best_sheet_idx != -1:
+            sheet = sheets[best_sheet_idx]
+            fr = sheet['free_rects'].pop(best_rect_idx)
+            ow, oh = best_orientation
+            sheet['items'].append({'id': p['id'], 'x': fr['x'], 'y': fr['y'], 'w': ow, 'h': oh})
             
-            current_sheet_items = []
-            current_sheet_y = 0
-            active_strips = []
+            w_left = fr['w'] - ow
+            h_left = fr['h'] - oh
             
-            ow, oh = orientations[0] 
-            if ow <= stock_w and oh <= stock_h:
-                new_strip = {
-                    'y': 0,
-                    'h': oh,
-                    'x_curr': ow,
-                    'w_max': stock_w
-                }
-                active_strips.append(new_strip)
-                current_sheet_items.append({
-                    'id': p['id'], 
-                    'x': 0, 
-                    'y': 0, 
-                    'w': ow, 
-                    'h': oh
-                })
-                current_sheet_y = oh
+            # Δοκιμή Οριζόντιας Κοπής
+            area_h_right = w_left * oh
+            area_h_top = fr['w'] * h_left
+            max_area_h = max(area_h_right, area_h_top)
+            
+            # Δοκιμή Κάθετης Κοπής
+            area_v_right = w_left * fr['h']
+            area_v_top = ow * h_left
+            max_area_v = max(area_v_right, area_v_top)
+            
+            # Επιλέγουμε την κοπή που αφήνει το μεγαλύτερο, ενιαίο καθαρό ρετάλι (MAXAS)
+            if max_area_h > max_area_v:
+                r_right = {'x': fr['x'] + ow, 'y': fr['y'], 'w': w_left, 'h': oh}
+                r_top = {'x': fr['x'], 'y': fr['y'] + oh, 'w': fr['w'], 'h': h_left}
             else:
-                 current_sheet_items.append({'id': p['id'], 'x': 0, 'y': 0, 'w': p['w'], 'h': p['h']})
-                 current_sheet_y = p['h']
-
-    if current_sheet_items:
-        placed_sheets.append(current_sheet_items)
-
+                r_right = {'x': fr['x'] + ow, 'y': fr['y'], 'w': w_left, 'h': fr['h']}
+                r_top = {'x': fr['x'], 'y': fr['y'] + oh, 'w': ow, 'h': h_left}
+                
+            if r_right['w'] > 0 and r_right['h'] > 0: sheet['free_rects'].append(r_right)
+            if r_top['w'] > 0 and r_top['h'] > 0: sheet['free_rects'].append(r_top)
+            
+        else:
+            # Άνοιγμα νέου φύλλου
+            ow, oh = orientations[0]
+            new_sheet = {'items': [{'id': p['id'], 'x': 0, 'y': 0, 'w': ow, 'h': oh}], 'free_rects': []}
+            
+            w_left = stock_w - ow
+            h_left = stock_h - oh
+            
+            area_h_right = w_left * oh
+            area_h_top = stock_w * h_left
+            max_area_h = max(area_h_right, area_h_top)
+            
+            area_v_right = w_left * stock_h
+            area_v_top = ow * h_left
+            max_area_v = max(area_v_right, area_v_top)
+            
+            if max_area_h > max_area_v:
+                r_right = {'x': ow, 'y': 0, 'w': w_left, 'h': oh}
+                r_top = {'x': 0, 'y': oh, 'w': stock_w, 'h': h_left}
+            else:
+                r_right = {'x': ow, 'y': 0, 'w': w_left, 'h': stock_h}
+                r_top = {'x': 0, 'y': oh, 'w': ow, 'h': h_left}
+                
+            if r_right['w'] > 0 and r_right['h'] > 0: new_sheet['free_rects'].append(r_right)
+            if r_top['w'] > 0 and r_top['h'] > 0: new_sheet['free_rects'].append(r_top)
+            
+            sheets.append(new_sheet)
+            
+    placed_sheets = [s['items'] for s in sheets]
     sheets_needed = max(1, len(placed_sheets))
     total_used_area = sum([(p['w']/1000.0)*(p['h']/1000.0) for p in individual_pieces])
     total_stock_area = sheets_needed * stock_area
