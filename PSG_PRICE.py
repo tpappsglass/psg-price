@@ -274,7 +274,7 @@ def calculate_component_cost(glasses_list, pvbs_list, temp_list, hst_list, silk_
     return base_cost, extra_cost, any_tempered
 
 # ---------------------------------------------------------
-# INDUSTRIAL OPTIMA-STYLE NESTING (Guillotine BSSF + MAXAS)
+# INDUSTRIAL OPTIMA-STYLE NESTING (Left Compression + MAXAS)
 # ---------------------------------------------------------
 def run_guillotine_nesting(items, stock_w, stock_h):
     stock_area = (stock_w / 1000.0) * (stock_h / 1000.0)
@@ -286,9 +286,8 @@ def run_guillotine_nesting(items, stock_w, stock_h):
             individual_pieces.append({'id': p_id, 'w': item['w'], 'h': item['h']})
             p_id += 1
 
-    # Ταξινόμηση βάσει ΕΜΒΑΔΟΥ (φθίνουσα) και μετά βάσει μεγαλύτερης πλευράς
-    # Αυτό εξασφαλίζει ότι τα "σαλόνια" μπαίνουν πρώτα
-    individual_pieces.sort(key=lambda p: (p['w'] * p['h'], max(p['w'], p['h'])), reverse=True)
+    # Ταξινόμηση βάσει ΜΕΓΑΛΥΤΕΡΗΣ ΠΛΕΥΡΑΣ πρώτα (για να στήνει κολώνες) και μετά ΕΜΒΑΔΟΥ
+    individual_pieces.sort(key=lambda p: (max(p['w'], p['h']), p['w']*p['h']), reverse=True)
 
     sheets = []
     
@@ -300,28 +299,30 @@ def run_guillotine_nesting(items, stock_w, stock_h):
         best_sheet_idx = -1
         best_rect_idx = -1
         best_orientation = None
-        best_score_1 = float('inf') # Short side (BSSF)
-        best_score_2 = float('inf') # Long side
-        best_y = float('inf')
         
-        # Σκανάρισμα όλων των κενών σε όλα τα φύλλα για ασφυκτικό στρίμωγμα
+        # Στόχος: Να ελαχιστοποιήσουμε το δεξί όριο (x + width) του κάθε τζαμιού.
+        # Έτσι ο αλγόριθμος πιέζει τα πάντα αριστερά και γυρίζει τα τζάμια κάθετα από μόνος του!
+        best_right_bound = float('inf')
+        best_top_bound = float('inf')
+        best_area_fit = float('inf')
+        
         for s_idx, sheet in enumerate(sheets):
             for r_idx, fr in enumerate(sheet['free_rects']):
                 for ow, oh in orientations:
                     if ow <= fr['w'] and oh <= fr['h']:
-                        leftover_w = fr['w'] - ow
-                        leftover_h = fr['h'] - oh
+                        right_bound = fr['x'] + ow
+                        top_bound = fr['y'] + oh
+                        area_fit = (fr['w'] * fr['h']) - (ow * oh)
                         
-                        # Best Short Side Fit (BSSF)
-                        score_1 = min(leftover_w, leftover_h)
-                        score_2 = max(leftover_w, leftover_h)
-                        
-                        if score_1 < best_score_1 or \
-                           (score_1 == best_score_1 and score_2 < best_score_2) or \
-                           (score_1 == best_score_1 and score_2 == best_score_2 and fr['y'] < best_y):
-                            best_score_1 = score_1
-                            best_score_2 = score_2
-                            best_y = fr['y']
+                        # 1. Πίεση αριστερά (Right Bound)
+                        # 2. Πίεση κάτω (Top Bound)
+                        # 3. Καλύτερη κάλυψη του κενού
+                        if right_bound < best_right_bound or \
+                           (right_bound == best_right_bound and top_bound < best_top_bound) or \
+                           (right_bound == best_right_bound and top_bound == best_top_bound and area_fit < best_area_fit):
+                            best_right_bound = right_bound
+                            best_top_bound = top_bound
+                            best_area_fit = area_fit
                             best_sheet_idx = s_idx
                             best_rect_idx = r_idx
                             best_orientation = (ow, oh)
@@ -357,8 +358,14 @@ def run_guillotine_nesting(items, stock_w, stock_h):
             if r_top['w'] > 0 and r_top['h'] > 0: sheet['free_rects'].append(r_top)
             
         else:
-            # Άνοιγμα νέου φύλλου
-            ow, oh = orientations[0]
+            # Άνοιγμα νέου φύλλου: Διαλέγουμε τον προσανατολισμό που αφήνει το μεγαλύτερο πλάτος δεξιά
+            best_new_ow, best_new_oh = orientations[0]
+            for o_w, o_h in orientations:
+                if o_w <= stock_w and o_h <= stock_h:
+                    if o_w < best_new_ow: 
+                        best_new_ow, best_new_oh = o_w, o_h
+            
+            ow, oh = best_new_ow, best_new_oh
             new_sheet = {'items': [{'id': p['id'], 'x': 0, 'y': 0, 'w': ow, 'h': oh}], 'free_rects': []}
             
             w_left = stock_w - ow
