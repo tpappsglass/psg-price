@@ -16,160 +16,165 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 # ---------------------------------------------------------
-# REGISTER UNICODE GREEK FONT (Arial Narrow)
+# REGISTER UNICODE GREEK FONT (Arial Narrow / Arial)
 # ---------------------------------------------------------
 try:
-    # Διαβάζει ακριβώς τα αρχεία που ανέβηκαν στο GitHub
     pdfmetrics.registerFont(TTFont('Arial', 'ARIALN.TTF'))
     pdfmetrics.registerFont(TTFont('Arial-Bold', 'ARIALNB.TTF'))
     FONT_NAME = 'Arial'
     FONT_BOLD = 'Arial-Bold'
 except Exception as e:
-    st.error(f"Σφάλμα φόρτωσης γραμματοσειράς: {e}")
-    FONT_NAME = 'Helvetica'
-    FONT_BOLD = 'Helvetica-Bold'
+    # Αν τρέχει τοπικά και έχει τα κλασικά αρχεία
+    try:
+        pdfmetrics.registerFont(TTFont('Arial', 'arial.ttf'))
+        pdfmetrics.registerFont(TTFont('Arial-Bold', 'arialbd.ttf'))
+        FONT_NAME = 'Arial'
+        FONT_BOLD = 'Arial-Bold'
+    except:
+        FONT_NAME = 'Helvetica'
+        FONT_BOLD = 'Helvetica-Bold'
 
 # ---------------------------------------------------------
 # PAGE CONFIG
 # ---------------------------------------------------------
-st.set_page_config(page_title="PSG PRICE - Calumen & Precision Nesting Engine", layout="wide")
+st.set_page_config(page_title="PSG PRICE - Calumen & Pro Nesting Engine", layout="wide")
 
 # ---------------------------------------------------------
 # EXTENDED GLASS DATABASE (KOSTOLOGIO)
 # ---------------------------------------------------------
 GLASS_DB = {
-    "CLEAR FLOAT GLASS 3 mm": {"cost": 3.47, "type": "CLEAR FLOAT GLASS"},
-    "CLEAR FLOAT GLASS 4 mm": {"cost": 4.20, "type": "CLEAR FLOAT GLASS"},
-    "CLEAR FLOAT GLASS 5 mm": {"cost": 5.25, "type": "CLEAR FLOAT GLASS"},
-    "CLEAR FLOAT GLASS 6 mm": {"cost": 6.30, "type": "CLEAR FLOAT GLASS"},
-    "CLEAR FLOAT GLASS 8 mm": {"cost": 8.82, "type": "CLEAR FLOAT GLASS"},
-    "CLEAR FLOAT GLASS 10 mm": {"cost": 11.03, "type": "CLEAR FLOAT GLASS"},
-    "CLEAR FLOAT GLASS 12 mm": {"cost": 15.75, "type": "CLEAR FLOAT GLASS"},
-    "TINTED FLOAT GLASS 4 mm": {"cost": 5.70, "type": "TINTED FLOAT GLASS"},
-    "TINTED FLOAT GLASS 5 mm": {"cost": 7.13, "type": "TINTED FLOAT GLASS"},
-    "TINTED FLOAT GLASS 6 mm": {"cost": 8.55, "type": "TINTED FLOAT GLASS"},
-    "TINTED FLOAT GLASS 8 mm": {"cost": 11.97, "type": "TINTED FLOAT GLASS"},
-    "TINTED FLOAT GLASS 10 mm": {"cost": 14.96, "type": "TINTED FLOAT GLASS"},
-    "SATINATED GLASS 4 mm": {"cost": 7.80, "type": "SATINATED GLASS"},
-    "SATINATED GLASS 5 mm": {"cost": 8.75, "type": "SATINATED GLASS"},
-    "SATINATED GLASS 6 mm": {"cost": 9.70, "type": "SATINATED GLASS"},
-    "SATINATED GLASS 8 mm": {"cost": 11.98, "type": "SATINATED GLASS"},
-    "SATINATED GLASS 10 mm": {"cost": 13.98, "type": "SATINATED GLASS"},
-    "MIRROR 3 mm": {"cost": 8.00, "type": "MIRROR"},
-    "MIRROR 4 mm": {"cost": 9.00, "type": "MIRROR"},
-    "MIRROR 5 mm": {"cost": 10.00, "type": "MIRROR"},
-    "MIRROR 6 mm": {"cost": 11.00, "type": "MIRROR"},
-    "DIAMANT® 4 mm": {"cost": 7.65, "type": "DIAMANT®"},
-    "DIAMANT® 5 mm": {"cost": 9.60, "type": "DIAMANT®"},
-    "DIAMANT® 6 mm": {"cost": 11.00, "type": "DIAMANT®"},
-    "DIAMANT® 8 mm": {"cost": 15.40, "type": "DIAMANT®"},
-    "DIAMANT® 10 mm": {"cost": 19.00, "type": "DIAMANT®"},
-    "COOL LITE® ST 108 6mm": {"cost": 23.00, "type": "COOL LITE® ST 108"},
-    "4mm LOUKI 4mm": {"cost": 13.00, "type": "4mm LOUKI"},
-    "6mm LOUKI 6mm": {"cost": 19.70, "type": "6mm LOUKI"},
-    "8mm LOUKI 8mm": {"cost": 27.00, "type": "8mm LOUKI"},
-    "LAMINATED GLASS 33.1": {"cost": 11.00, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 33.2": {"cost": 13.00, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 33.4": {"cost": 17.00, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 33.2 MAT": {"cost": 14.00, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 33.2 SC": {"cost": 15.00, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 44.1": {"cost": 12.98, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 44.2": {"cost": 14.98, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 44.4": {"cost": 18.98, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 44.1 MAT": {"cost": 15.98, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 44.2 SC": {"cost": 16.98, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 55.1": {"cost": 15.32, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 55.2": {"cost": 17.32, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 55.4": {"cost": 21.32, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 55.1 MAT": {"cost": 18.32, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 55.2 SC": {"cost": 19.32, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 66.1": {"cost": 17.77, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 66.2": {"cost": 19.77, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 66.4": {"cost": 23.77, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 66.1 MAT": {"cost": 19.77, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 66.2 SC": {"cost": 21.77, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 88.1": {"cost": 24.50, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 66.8": {"cost": 31.77, "type": "LAMINATED GLASS"},
-    "LAMINATED GLASS 88.12": {"cost": 46.87, "type": "LAMINATED GLASS"},
-    "CLIMAX 4mm": {"cost": 5.70, "type": "CLIMAX"},
-    "CLIMAX 6mm": {"cost": 7.80, "type": "CLIMAX"},
-    "CLIMAX 33.1": {"cost": 13.00, "type": "CLIMAX"},
-    "CLIMAX 44.1": {"cost": 14.98, "type": "CLIMAX"},
-    "CLIMAX 33.1 SC": {"cost": 17.00, "type": "CLIMAX"},
-    "CLIMAX SC 44.1 SC": {"cost": 18.98, "type": "CLIMAX SC"},
-    "CLIMAX SELECT 4mm": {"cost": 6.70, "type": "CLIMAX SELECT"},
-    "CLIMAX SELECT 6mm": {"cost": 8.20, "type": "CLIMAX SELECT"},
-    "CLIMAX SELECT 33.1": {"cost": 14.00, "type": "CLIMAX SELECT"},
-    "CLIMAX SELECT 44.1": {"cost": 15.98, "type": "CLIMAX SELECT"},
-    "CLIMAX SELECT SC 33.1 SC": {"cost": 18.00, "type": "CLIMAX SELECT SC"},
-    "CLIMAX SELECT SC 44.1 SC": {"cost": 19.98, "type": "CLIMAX SELECT SC"},
-    "ŞİŞECAM T 62/44 6mm": {"cost": 9.70, "type": "ŞİŞECAM T 62/44"},
-    "ŞİŞECAM T 62/44 8mm": {"cost": 12.22, "type": "ŞİŞECAM T 62/44"},
-    "ŞİŞECAM T 43/28 6mm": {"cost": 9.70, "type": "ŞİŞECAM T 43/28"},
-    "ŞİŞECAM T 43/28 8mm": {"cost": 12.22, "type": "ŞİŞECAM T 43/28"},
-    "ŞİŞECAM T 70/33 6mm": {"cost": 12.20, "type": "ŞİŞECAM T 70/33"},
-    "ŞİŞECAM T70/33 8mm": {"cost": 14.72, "type": "ŞİŞECAM T70/33"},
-    "PLANITHERM® XN 4mm": {"cost": 7.35, "type": "PLANITHERM® XN"},
-    "PLANITHERM® XN 6mm": {"cost": 10.70, "type": "PLANITHERM® XN"},
-    "PLANITHERM® XN 8mm": {"cost": 14.10, "type": "PLANITHERM® XN"},
-    "STADIP® PLANITHERM® XN 33.1": {"cost": 18.40, "type": "STADIP® PLANITHERM® XN"},
-    "STADIP® PLANITHERM® XN 33.2": {"cost": 21.60, "type": "STADIP® PLANITHERM® XN"},
-    "STADIP® PLANITHERM® XN 33.2 SC": {"cost": 22.30, "type": "STADIP® PLANITHERM® XN"},
-    "STADIP® PLANITHERM® XN 44.1": {"cost": 17.80, "type": "STADIP® PLANITHERM® XN"},
-    "STADIP® PLANITHERM® XN 44.2": {"cost": 21.00, "type": "STADIP® PLANITHERM® XN"},
-    "STADIP® PLANITHERM® XN 44.2 SC": {"cost": 21.70, "type": "STADIP® PLANITHERM® XN"},
-    "STADIP® PLANITHERM® XN 66.1": {"cost": 25.10, "type": "STADIP® PLANITHERM® XN"},
-    "STADIP® PLANITHERM® XN 66.2": {"cost": 28.30, "type": "STADIP® PLANITHERM® XN"},
-    "STADIP® PLANITHERM® XN 66.2 SC": {"cost": 29.00, "type": "STADIP® PLANITHERM® XN"},
-    "PLANISTAR® EVO 4mm": {"cost": 8.75, "type": "PLANISTAR® EVO"},
-    "PLANISTAR® EVO 6mm": {"cost": 12.10, "type": "PLANISTAR® EVO"},
-    "PLANISTAR® EVO 8mm": {"cost": 15.50, "type": "PLANISTAR® EVO"},
-    "STADIP® PLANISTAR® EVO 33.1": {"cost": 16.20, "type": "STADIP® PLANISTAR® EVO"},
-    "STADIP® PLANISTAR® EVO 33.2": {"cost": 19.40, "type": "STADIP® PLANISTAR® EVO"},
-    "STADIP® PLANISTAR® EVO 33.2 SC": {"cost": 20.10, "type": "STADIP® PLANISTAR® EVO"},
-    "STADIP® PLANISTAR® EVO 44.1": {"cost": 18.70, "type": "STADIP® PLANISTAR® EVO"},
-    "STADIP® PLANISTAR® EVO 44.2": {"cost": 21.90, "type": "STADIP® PLANISTAR® EVO"},
-    "STADIP® PLANISTAR® EVO 44.2 SC": {"cost": 22.60, "type": "STADIP® PLANISTAR® EVO"},
-    "STADIP® PLANISTAR® EVO 66.1": {"cost": 26.00, "type": "STADIP® PLANISTAR® EVO"},
-    "STADIP® PLANISTAR® EVO 66.2": {"cost": 29.20, "type": "STADIP® PLANISTAR® EVO"},
-    "STADIP® PLANISTAR® EVO 66.2 SC": {"cost": 29.90, "type": "STADIP® PLANISTAR® EVO"},
-    "PLANISTAR® SUN PLUS 4mm": {"cost": 10.75, "type": "PLANISTAR® SUN PLUS"},
-    "PLANISTAR® SUN PLUS 6mm": {"cost": 14.10, "type": "PLANISTAR® SUN PLUS"},
-    "STADIP® PLANISTAR® SUN PLUS 33.1": {"cost": 18.40, "type": "STADIP® PLANISTAR® SUN PLUS"},
-    "STADIP® PLANISTAR® SUN PLUS 33.2": {"cost": 21.60, "type": "STADIP® PLANISTAR® SUN PLUS"},
-    "STADIP® PLANISTAR® SUN PLUS 33.2 SC": {"cost": 22.30, "type": "STADIP® PLANISTAR® SUN PLUS"},
-    "STADIP® PLANISTAR® SUN PLUS 44.1": {"cost": 20.90, "type": "STADIP® PLANISTAR® SUN PLUS"},
-    "STADIP® PLANISTAR® SUN PLUS 44.2": {"cost": 24.10, "type": "STADIP® PLANISTAR® SUN PLUS"},
-    "STADIP® PLANISTAR® SUN PLUS 44.2 SC": {"cost": 24.80, "type": "STADIP® PLANISTAR® SUN PLUS"},
-    "COOL LITE® KN 166 II 6mm": {"cost": 16.50, "type": "COOL LITE® KN 166 II"},
-    "COOL LITE® KN 166 II 8mm": {"cost": 20.80, "type": "COOL LITE® KN 166 II"},
-    "COOL LITE® KN 166 II 10mm": {"cost": 24.60, "type": "COOL LITE® KN 166 II"},
-    "COOL LITE® KN 148 II 6mm": {"cost": 16.50, "type": "COOL LITE® KN 148 II"},
-    "COOL LITE® KN 148 II 8mm": {"cost": 20.80, "type": "COOL LITE® KN 148 II"},
-    "COOL LITE® KN 148 II 10mm": {"cost": 24.60, "type": "COOL LITE® KN 148 II"},
-    "COOL LITE® SKN 154 II 6mm": {"cost": 20.50, "type": "COOL LITE® SKN 154 II"},
-    "COOL LITE® SKN 154 II 8mm": {"cost": 24.80, "type": "COOL LITE® SKN 154 II"},
-    "COOL LITE® SKN 154 II 10mm": {"cost": 28.60, "type": "COOL LITE® SKN 154 II"},
-    "COOL LITE® SKN 176 II 6mm": {"cost": 20.50, "type": "COOL LITE® SKN 176 II"},
-    "COOL LITE® SKN 176 II 8mm": {"cost": 24.80, "type": "COOL LITE® SKN 176 II"},
-    "COOL LITE® SKN 176 II 10mm": {"cost": 28.60, "type": "COOL LITE® SKN 176 II"},
-    "COOL LITE® SKN 144 II 6mm": {"cost": 24.00, "type": "COOL LITE® SKN 144 II"},
-    "COOL LITE® SKN 144 II 8mm": {"cost": 29.30, "type": "COOL LITE® SKN 144 II"},
-    "COOL LITE® SKN 144 II 10mm": {"cost": 34.50, "type": "COOL LITE® SKN 144 II"},
-    "COOL LITE® SKN 183 II 6mm": {"cost": 24.00, "type": "COOL LITE® SKN 183 II"},
-    "COOL LITE® SKN 183 II 8mm": {"cost": 29.30, "type": "COOL LITE® SKN 183 II"},
-    "COOL LITE® SKN 183 II 10mm": {"cost": 34.50, "type": "COOL LITE® SKN 183 II"},
-    "COOL LITE® XTREME 61/29 6mm": {"cost": 26.00, "type": "COOL LITE® XTREME 61/29"},
-    "COOL LITE® XTREME 61/29 8mm": {"cost": 31.50, "type": "COOL LITE® XTREME 61/29"},
-    "COOL LITE® XTREME 61/29 10mm": {"cost": 36.50, "type": "COOL LITE® XTREME 61/29"},
-    "COOL LITE® XTREME 70/33 6mm": {"cost": 26.00, "type": "COOL LITE® XTREME 70/33"},
-    "COOL LITE® XTREME 70/33 8mm": {"cost": 31.50, "type": "COOL LITE® XTREME 70/33"},
-    "COOL LITE® XTREME 70/33 10mm": {"cost": 36.50, "type": "COOL LITE® XTREME 70/33"},
-    "GUARDIAN SN 70S II 6mm": {"cost": 18.10, "type": "GUARDIAN SN 70S II"},
-    "GUARDIAN SN 63S II 6mm": {"cost": 20.00, "type": "GUARDIAN SN 63S II"},
-    "GUARDIAN SNX 60S II 6mm": {"cost": 24.10, "type": "GUARDIAN SNX 60S II"},
-    "GUARDIAN SN 70/37 II 6mm": {"cost": 21.30, "type": "GUARDIAN SN 70/37 II"},
-    "GUARDIAN SN 75 II 6mm": {"cost": 19.39, "type": "GUARDIAN SN 75 II"},
+    "CLEAR FLOAT GLASS 3 mm": {"cost": 3.47},
+    "CLEAR FLOAT GLASS 4 mm": {"cost": 4.20},
+    "CLEAR FLOAT GLASS 5 mm": {"cost": 5.25},
+    "CLEAR FLOAT GLASS 6 mm": {"cost": 6.30},
+    "CLEAR FLOAT GLASS 8 mm": {"cost": 8.82},
+    "CLEAR FLOAT GLASS 10 mm": {"cost": 11.03},
+    "CLEAR FLOAT GLASS 12 mm": {"cost": 15.75},
+    "TINTED FLOAT GLASS 4 mm": {"cost": 5.70},
+    "TINTED FLOAT GLASS 5 mm": {"cost": 7.13},
+    "TINTED FLOAT GLASS 6 mm": {"cost": 8.55},
+    "TINTED FLOAT GLASS 8 mm": {"cost": 11.97},
+    "TINTED FLOAT GLASS 10 mm": {"cost": 14.96},
+    "SATINATED GLASS 4 mm": {"cost": 7.80},
+    "SATINATED GLASS 5 mm": {"cost": 8.75},
+    "SATINATED GLASS 6 mm": {"cost": 9.70},
+    "SATINATED GLASS 8 mm": {"cost": 11.98},
+    "SATINATED GLASS 10 mm": {"cost": 13.98},
+    "MIRROR 3 mm": {"cost": 8.00},
+    "MIRROR 4 mm": {"cost": 9.00},
+    "MIRROR 5 mm": {"cost": 10.00},
+    "MIRROR 6 mm": {"cost": 11.00},
+    "DIAMANT® 4 mm": {"cost": 7.65},
+    "DIAMANT® 5 mm": {"cost": 9.60},
+    "DIAMANT® 6 mm": {"cost": 11.00},
+    "DIAMANT® 8 mm": {"cost": 15.40},
+    "DIAMANT® 10 mm": {"cost": 19.00},
+    "COOL LITE® ST 108 6mm": {"cost": 23.00},
+    "4mm LOUKI 4mm": {"cost": 13.00},
+    "6mm LOUKI 6mm": {"cost": 19.70},
+    "8mm LOUKI 8mm": {"cost": 27.00},
+    "LAMINATED GLASS 33.1": {"cost": 11.00},
+    "LAMINATED GLASS 33.2": {"cost": 13.00},
+    "LAMINATED GLASS 33.4": {"cost": 17.00},
+    "LAMINATED GLASS 33.2 MAT": {"cost": 14.00},
+    "LAMINATED GLASS 33.2 SC": {"cost": 15.00},
+    "LAMINATED GLASS 44.1": {"cost": 12.98},
+    "LAMINATED GLASS 44.2": {"cost": 14.98},
+    "LAMINATED GLASS 44.4": {"cost": 18.98},
+    "LAMINATED GLASS 44.1 MAT": {"cost": 15.98},
+    "LAMINATED GLASS 44.2 SC": {"cost": 16.98},
+    "LAMINATED GLASS 55.1": {"cost": 15.32},
+    "LAMINATED GLASS 55.2": {"cost": 17.32},
+    "LAMINATED GLASS 55.4": {"cost": 21.32},
+    "LAMINATED GLASS 55.1 MAT": {"cost": 18.32},
+    "LAMINATED GLASS 55.2 SC": {"cost": 19.32},
+    "LAMINATED GLASS 66.1": {"cost": 17.77},
+    "LAMINATED GLASS 66.2": {"cost": 19.77},
+    "LAMINATED GLASS 66.4": {"cost": 23.77},
+    "LAMINATED GLASS 66.1 MAT": {"cost": 19.77},
+    "LAMINATED GLASS 66.2 SC": {"cost": 21.77},
+    "LAMINATED GLASS 88.1": {"cost": 24.50},
+    "LAMINATED GLASS 66.8": {"cost": 31.77},
+    "LAMINATED GLASS 88.12": {"cost": 46.87},
+    "CLIMAX 4mm": {"cost": 5.70},
+    "CLIMAX 6mm": {"cost": 7.80},
+    "CLIMAX 33.1": {"cost": 13.00},
+    "CLIMAX 44.1": {"cost": 14.98},
+    "CLIMAX 33.1 SC": {"cost": 17.00},
+    "CLIMAX SC 44.1 SC": {"cost": 18.98},
+    "CLIMAX SELECT 4mm": {"cost": 6.70},
+    "CLIMAX SELECT 6mm": {"cost": 8.20},
+    "CLIMAX SELECT 33.1": {"cost": 14.00},
+    "CLIMAX SELECT 44.1": {"cost": 15.98},
+    "CLIMAX SELECT SC 33.1 SC": {"cost": 18.00},
+    "CLIMAX SELECT SC 44.1 SC": {"cost": 19.98},
+    "ŞİŞECAM T 62/44 6mm": {"cost": 9.70},
+    "ŞİŞECAM T 62/44 8mm": {"cost": 12.22},
+    "ŞİŞECAM T 43/28 6mm": {"cost": 9.70},
+    "ŞİŞECAM T 43/28 8mm": {"cost": 12.22},
+    "ŞİŞECAM T 70/33 6mm": {"cost": 12.20},
+    "ŞİŞECAM T70/33 8mm": {"cost": 14.72},
+    "PLANITHERM® XN 4mm": {"cost": 7.35},
+    "PLANITHERM® XN 6mm": {"cost": 10.70},
+    "PLANITHERM® XN 8mm": {"cost": 14.10},
+    "STADIP® PLANITHERM® XN 33.1": {"cost": 18.40},
+    "STADIP® PLANITHERM® XN 33.2": {"cost": 21.60},
+    "STADIP® PLANITHERM® XN 33.2 SC": {"cost": 22.30},
+    "STADIP® PLANITHERM® XN 44.1": {"cost": 17.80},
+    "STADIP® PLANITHERM® XN 44.2": {"cost": 21.00},
+    "STADIP® PLANITHERM® XN 44.2 SC": {"cost": 21.70},
+    "STADIP® PLANITHERM® XN 66.1": {"cost": 25.10},
+    "STADIP® PLANITHERM® XN 66.2": {"cost": 28.30},
+    "STADIP® PLANITHERM® XN 66.2 SC": {"cost": 29.00},
+    "PLANISTAR® EVO 4mm": {"cost": 8.75},
+    "PLANISTAR® EVO 6mm": {"cost": 12.10},
+    "PLANISTAR® EVO 8mm": {"cost": 15.50},
+    "STADIP® PLANISTAR® EVO 33.1": {"cost": 16.20},
+    "STADIP® PLANISTAR® EVO 33.2": {"cost": 19.40},
+    "STADIP® PLANISTAR® EVO 33.2 SC": {"cost": 20.10},
+    "STADIP® PLANISTAR® EVO 44.1": {"cost": 18.70},
+    "STADIP® PLANISTAR® EVO 44.2": {"cost": 21.90},
+    "STADIP® PLANISTAR® EVO 44.2 SC": {"cost": 22.60},
+    "STADIP® PLANISTAR® EVO 66.1": {"cost": 26.00},
+    "STADIP® PLANISTAR® EVO 66.2": {"cost": 29.20},
+    "STADIP® PLANISTAR® EVO 66.2 SC": {"cost": 29.90},
+    "PLANISTAR® SUN PLUS 4mm": {"cost": 10.75},
+    "PLANISTAR® SUN PLUS 6mm": {"cost": 14.10},
+    "STADIP® PLANISTAR® SUN PLUS 33.1": {"cost": 18.40},
+    "STADIP® PLANISTAR® SUN PLUS 33.2": {"cost": 21.60},
+    "STADIP® PLANISTAR® SUN PLUS 33.2 SC": {"cost": 22.30},
+    "STADIP® PLANISTAR® SUN PLUS 44.1": {"cost": 20.90},
+    "STADIP® PLANISTAR® SUN PLUS 44.2": {"cost": 24.10},
+    "STADIP® PLANISTAR® SUN PLUS 44.2 SC": {"cost": 24.80},
+    "COOL LITE® KN 166 II 6mm": {"cost": 16.50},
+    "COOL LITE® KN 166 II 8mm": {"cost": 20.80},
+    "COOL LITE® KN 166 II 10mm": {"cost": 24.60},
+    "COOL LITE® KN 148 II 6mm": {"cost": 16.50},
+    "COOL LITE® KN 148 II 8mm": {"cost": 20.80},
+    "COOL LITE® KN 148 II 10mm": {"cost": 24.60},
+    "COOL LITE® SKN 154 II 6mm": {"cost": 20.50},
+    "COOL LITE® SKN 154 II 8mm": {"cost": 24.80},
+    "COOL LITE® SKN 154 II 10mm": {"cost": 28.60},
+    "COOL LITE® SKN 176 II 6mm": {"cost": 20.50},
+    "COOL LITE® SKN 176 II 8mm": {"cost": 24.80},
+    "COOL LITE® SKN 176 II 10mm": {"cost": 28.60},
+    "COOL LITE® SKN 144 II 6mm": {"cost": 24.00},
+    "COOL LITE® SKN 144 II 8mm": {"cost": 29.30},
+    "COOL LITE® SKN 144 II 10mm": {"cost": 34.50},
+    "COOL LITE® SKN 183 II 6mm": {"cost": 24.00},
+    "COOL LITE® SKN 183 II 8mm": {"cost": 29.30},
+    "COOL LITE® SKN 183 II 10mm": {"cost": 34.50},
+    "COOL LITE® XTREME 61/29 6mm": {"cost": 26.00},
+    "COOL LITE® XTREME 61/29 8mm": {"cost": 31.50},
+    "COOL LITE® XTREME 61/29 10mm": {"cost": 36.50},
+    "COOL LITE® XTREME 70/33 6mm": {"cost": 26.00},
+    "COOL LITE® XTREME 70/33 8mm": {"cost": 31.50},
+    "COOL LITE® XTREME 70/33 10mm": {"cost": 36.50},
+    "GUARDIAN SN 70S II 6mm": {"cost": 18.10},
+    "GUARDIAN SN 63S II 6mm": {"cost": 20.00},
+    "GUARDIAN SNX 60S II 6mm": {"cost": 24.10},
+    "GUARDIAN SN 70/37 II 6mm": {"cost": 21.30},
+    "GUARDIAN SN 75 II 6mm": {"cost": 19.39},
 }
 
 PVB_DB = {
@@ -190,16 +195,21 @@ SPACER_PRICES = {
     "Technoform > 18mm": 15.00
 }
 
-PROCESSING_COSTS = {
-    "tempering": 6.50,
-    "lami_processing": 7.00,
-    "rode": 1.20,
-    "packing_transport": 3.50,
-    "hst": 15.00,         # €/m² ανά γυαλί
-    "silkscreen": 15.00,  # €/m² ανά γυαλί
-    "step": 15.00,        # €/m² ανά σύνθεση
-    "holes": 2.50         # €/m² ανά γυαλί με τρύπες
-}
+# ---------------------------------------------------------
+# PROCESSING COSTS (Base vs Flat Extras)
+# ---------------------------------------------------------
+# Base Costs (υπόκεινται σε markups)
+COST_TEMP = 6.50
+COST_LAMI_PROC = 7.00
+COST_RODE = 1.20
+COST_PACK = 3.50
+COST_HOLES = 2.50 # ανά φύλλο γυαλιού
+
+# Flat Extra Costs (ΔΕΝ παίρνουν ΓΒΕ & Κέρδος - προστίθενται ατόφια στο τέλος)
+FLAT_HST = 15.00
+FLAT_SILKSCREEN = 15.00
+FLAT_STEP = 15.00
+FLAT_BONDING = 35.00 # Μόνο αν > 4m² ανά τεμάχιο
 
 STOCK_SHEETS = {
     "6.000 x 3.210 mm (Jumbo - Προεπιλογή)": (6000, 3210),
@@ -208,7 +218,7 @@ STOCK_SHEETS = {
 }
 
 # ---------------------------------------------------------
-# SIDEBAR: FISCAL INPUTS (BASE DEFAULTS: 25% GBE / 15% PROFIT)
+# SIDEBAR: FISCAL INPUTS
 # ---------------------------------------------------------
 st.sidebar.header("📋 Διαχείριση Παραγγελίας")
 customer_name = st.sidebar.text_input("Όνομα Project / Πελάτη", "")
@@ -228,40 +238,50 @@ st.sidebar.info(f"💡 **Markups:**\n- ΓΒE: +{gbe_markup*100:.2f}%\n- Κέρδ
 # HELPER FUNCTIONS
 # ---------------------------------------------------------
 def clean_recipe_name(full_name):
-    if not full_name:
-        return ""
+    if not full_name: return ""
     return full_name.split(" (")[0].strip()
 
-def calculate_lami_component_cost(glasses_list, pvbs_list, temp_list, hst_list, silk_list, holes_list, is_rode):
-    cost = 0.0
+def calculate_component_cost(glasses_list, pvbs_list, temp_list, hst_list, silk_list, holes_list, manual_rode):
+    base_cost = 0.0
+    extra_cost = 0.0
     num_glasses = len(glasses_list)
     
+    any_tempered = any(temp_list)
+    is_rode = manual_rode or any_tempered # Το ροντέ είναι υποχρεωτικό αν υπάρχει Tempered!
+
     for g in glasses_list:
         if g in GLASS_DB:
-            cost += GLASS_DB[g]["cost"]
+            base_cost += GLASS_DB[g]["cost"]
 
     for pvb in pvbs_list:
         if pvb in PVB_DB:
-            cost += PVB_DB[pvb]
+            base_cost += PVB_DB[pvb]
 
     for temp in temp_list:
-        if temp: cost += PROCESSING_COSTS["tempering"]
-    for hst in hst_list:
-        if hst: cost += PROCESSING_COSTS["hst"]
-    for silk in silk_list:
-        if silk: cost += PROCESSING_COSTS["silkscreen"]
+        if temp: base_cost += COST_TEMP
+        
     for hole in holes_list:
-        if hole: cost += PROCESSING_COSTS["holes"]
+        if hole: base_cost += COST_HOLES
+
+    # Προσθήκες "Ατόφιες"
+    for hst in hst_list:
+        if hst: extra_cost += FLAT_HST
+    for silk in silk_list:
+        if silk: extra_cost += FLAT_SILKSCREEN
 
     if num_glasses > 1:
-        cost += (num_glasses - 1) * PROCESSING_COSTS["lami_processing"]
+        base_cost += (num_glasses - 1) * COST_LAMI_PROC
 
     if is_rode:
-        cost += PROCESSING_COSTS["rode"]
+        base_cost += COST_RODE
 
-    return cost
+    return base_cost, extra_cost, any_tempered
 
-def run_nesting_optimization_smart_rotation(items, stock_w, stock_h):
+def run_guillotine_nesting(items, stock_w, stock_h):
+    """
+    Advanced Guillotine 2D Bin Packing (Smart Rotation + Free Space Utilization)
+    Αντί να αφήνει το "νεκρό χώρο" άδειο, τον γεμίζει με μικρότερα κομμάτια!
+    """
     stock_area = (stock_w / 1000.0) * (stock_h / 1000.0)
     
     individual_pieces = []
@@ -271,55 +291,78 @@ def run_nesting_optimization_smart_rotation(items, stock_w, stock_h):
             individual_pieces.append({'id': p_id, 'w': item['w'], 'h': item['h']})
             p_id += 1
 
-    individual_pieces.sort(key=lambda p: max(p['w'], p['h']), reverse=True)
+    # Ταξινόμηση από το μεγαλύτερο στο μικρότερο (κρίσιμο για BSSF)
+    individual_pieces.sort(key=lambda p: (max(p['w'], p['h']), min(p['w'], p['h'])), reverse=True)
 
     placed_sheets = []
-    current_sheet_items = []
-    
-    curr_x, curr_y = 0, 0
-    max_row_h = 0
-    
+    free_rects_per_sheet = [] 
+
     for p in individual_pieces:
-        w, h = p['w'], p['h']
+        w_p, h_p = p['w'], p['h']
         orientations = []
-        if w <= stock_w and h <= stock_h:
-            orientations.append((w, h))
-        if h <= stock_w and w <= stock_h and w != h:
-            orientations.append((h, w))
+        if w_p <= stock_w and h_p <= stock_h:
+            orientations.append((w_p, h_p))
+        if h_p <= stock_w and w_p <= stock_h and w_p != h_p:
+            orientations.append((h_p, w_p))
             
         if not orientations:
-            continue
+            continue # Πολύ μεγάλο για το φύλλο
 
-        placed = False
-        for pw, ph in orientations:
-            if curr_x + pw <= stock_w and curr_y + ph <= stock_h:
-                current_sheet_items.append({'id': p['id'], 'x': curr_x, 'y': curr_y, 'w': pw, 'h': ph})
-                curr_x += pw
-                max_row_h = max(max_row_h, ph)
-                placed = True
-                break
-                
-        if not placed:
-            for pw, ph in orientations:
-                if curr_y + max_row_h + ph <= stock_h and pw <= stock_w:
-                    curr_y += max_row_h
-                    curr_x = 0
-                    max_row_h = ph
-                    current_sheet_items.append({'id': p['id'], 'x': curr_x, 'y': curr_y, 'w': pw, 'h': ph})
-                    curr_x += pw
-                    placed = True
-                    break
+        best_sheet = -1
+        best_rect_idx = -1
+        best_orientation = None
+        best_score = float('inf')
 
-        if not placed:
-            placed_sheets.append(current_sheet_items)
-            pw, ph = orientations[0]
-            current_sheet_items = [{'id': p['id'], 'x': 0, 'y': 0, 'w': pw, 'h': ph}]
-            curr_x = pw
-            curr_y = 0
-            max_row_h = ph
+        # Ψάχνουμε το καλύτερο κενό (Best Short Side Fit)
+        for s_idx, free_rects in enumerate(free_rects_per_sheet):
+            for r_idx, fr in enumerate(free_rects):
+                for ow, oh in orientations:
+                    if ow <= fr['w'] and oh <= fr['h']:
+                        score = min(fr['w'] - ow, fr['h'] - oh)
+                        if score < best_score:
+                            best_score = score
+                            best_sheet = s_idx
+                            best_rect_idx = r_idx
+                            best_orientation = (ow, oh)
 
-    if current_sheet_items:
-        placed_sheets.append(current_sheet_items)
+        if best_sheet != -1:
+            # Τοποθέτηση σε Υπάρχον Φύλλο
+            fr = free_rects_per_sheet[best_sheet].pop(best_rect_idx)
+            ow, oh = best_orientation
+            placed_sheets[best_sheet].append({'id': p['id'], 'x': fr['x'], 'y': fr['y'], 'w': ow, 'h': oh})
+
+            # Κόψιμο ελεύθερου χώρου (Guillotine Split)
+            if fr['w'] - ow > fr['h'] - oh:
+                rect_right = {'x': fr['x'] + ow, 'y': fr['y'], 'w': fr['w'] - ow, 'h': fr['h']}
+                rect_top = {'x': fr['x'], 'y': fr['y'] + oh, 'w': ow, 'h': fr['h'] - oh}
+            else:
+                rect_right = {'x': fr['x'] + ow, 'y': fr['y'], 'w': fr['w'] - ow, 'h': oh}
+                rect_top = {'x': fr['x'], 'y': fr['y'] + oh, 'w': fr['w'], 'h': fr['h'] - oh}
+
+            if rect_right['w'] > 0 and rect_right['h'] > 0:
+                free_rects_per_sheet[best_sheet].append(rect_right)
+            if rect_top['w'] > 0 and rect_top['h'] > 0:
+                free_rects_per_sheet[best_sheet].append(rect_top)
+
+        else:
+            # Τοποθέτηση σε Νέο Φύλλο
+            ow, oh = orientations[0]
+            placed_sheets.append([{'id': p['id'], 'x': 0, 'y': 0, 'w': ow, 'h': oh}])
+            
+            new_free = []
+            if stock_w - ow > stock_h - oh:
+                rect_right = {'x': ow, 'y': 0, 'w': stock_w - ow, 'h': stock_h}
+                rect_top = {'x': 0, 'y': oh, 'w': ow, 'h': stock_h - oh}
+            else:
+                rect_right = {'x': ow, 'y': 0, 'w': stock_w - ow, 'h': oh}
+                rect_top = {'x': 0, 'y': oh, 'w': stock_w, 'h': stock_h - oh}
+            
+            if rect_right['w'] > 0 and rect_right['h'] > 0:
+                new_free.append(rect_right)
+            if rect_top['w'] > 0 and rect_top['h'] > 0:
+                new_free.append(rect_top)
+            
+            free_rects_per_sheet.append(new_free)
 
     sheets_needed = max(1, len(placed_sheets))
     total_used_area = sum([(p['w']/1000.0)*(p['h']/1000.0) for p in individual_pieces])
@@ -641,17 +684,18 @@ def build_laminated_ui(pane_key_prefix, default_glass_key):
         silk_list.append(s)
         holes_list.append(hole)
 
-    p_rode = st.checkbox("Ροντέ / Τρόχισμα (Laminated)", key=f"{pane_key_prefix}_rode")
+    # Αν υπάρχει έστω και ένα Tempered, το Ροντέ θα επιβάλλεται αυτόματα.
+    any_temp = any(temp_list)
+    rode_label = "Ροντέ / Τρόχισμα (Μπαίνει αυτόματα λόγω Tempered)" if any_temp else "Ροντέ / Τρόχισμα (Laminated)"
+    p_rode = st.checkbox(rode_label, value=any_temp, disabled=any_temp, key=f"{pane_key_prefix}_rode")
 
     name = "+".join(glasses_list)
-    has_temp = any(temp_list)
-
-    return glasses_list, pvbs_list, temp_list, hst_list, silk_list, holes_list, p_rode, name, has_temp
+    return glasses_list, pvbs_list, temp_list, hst_list, silk_list, holes_list, p_rode, name, any_temp
 
 # ---------------------------------------------------------
 # STREAMLIT UI & APPS
 # ---------------------------------------------------------
-st.title("🧮 PSG PRICE - Calumen Style Configurator & Precision Nesting Engine")
+st.title("🧮 PSG PRICE - Calumen Style Configurator & Pro Nesting Engine")
 
 if 'recipes' not in st.session_state:
     st.session_state.recipes = {}
@@ -674,7 +718,8 @@ with tab1:
     col1, col2, col3 = st.columns(3)
     
     # GLASS 1 CONFIG
-    c1 = 0.0
+    c1_base = 0.0
+    c1_extra = 0.0
     name1 = ""
     has_temp1 = False
 
@@ -683,23 +728,26 @@ with tab1:
         p1_lami = st.checkbox("Είναι Laminated / Συγκολλημένος", key="p1_lami")
         
         if p1_lami:
-            st.markdown("**Σύνθεση Triplex / Laminated (έως 4 γυαλιά - Γ1):**")
+            st.markdown("**Σύνθεση Triplex / Laminated:**")
             g_list, pvb_list, t_list, h_list, s_list, hole_list, rode, name1, has_temp1 = build_laminated_ui("g1", "CLEAR FLOAT GLASS 4 mm")
-            c1 = calculate_lami_component_cost(g_list, pvb_list, t_list, h_list, s_list, hole_list, rode)
+            c1_base, c1_extra, _ = calculate_component_cost(g_list, pvb_list, t_list, h_list, s_list, hole_list, rode)
         else:
             g1_main = st.selectbox("Επιλογή Βασικού Γυαλιού 1", list(GLASS_DB.keys()), key="g1_main")
             p1_temp_main = st.checkbox("Security / Tempered", key="p1_temp_m")
             p1_hst_main = st.checkbox("Heat Soak Test (HST)", key="p1_hst_m")
             p1_silk_main = st.checkbox("Μεταξοτυπία", key="p1_silk_m")
             p1_holes_main = st.checkbox("Τρύπες", key="p1_holes_m")
-            p1_rode = st.checkbox("Ροντέ / Τρόχισμα", key="p1_rode")
+            
+            p1_rode_lbl = "Ροντέ / Τρόχισμα (Αυτόματα)" if p1_temp_main else "Ροντέ / Τρόχισμα"
+            p1_rode = st.checkbox(p1_rode_lbl, value=p1_temp_main, disabled=p1_temp_main, key="p1_rode")
 
             name1 = g1_main
             has_temp1 = p1_temp_main
-            c1 = calculate_lami_component_cost([g1_main], [], [p1_temp_main], [p1_hst_main], [p1_silk_main], [p1_holes_main], p1_rode)
+            c1_base, c1_extra, _ = calculate_component_cost([g1_main], [], [p1_temp_main], [p1_hst_main], [p1_silk_main], [p1_holes_main], p1_rode)
 
     # GLASS 2 CONFIG
-    c2 = 0.0
+    c2_base = 0.0
+    c2_extra = 0.0
     name2 = ""
     has_temp2 = False
 
@@ -708,23 +756,26 @@ with tab1:
             st.subheader("🟢 Μεσαίος / Εσωτερικός (Γ2)")
             p2_lami = st.checkbox("Είναι Laminated / Συγκολλημένος ", key="p2_lami")
             if p2_lami:
-                st.markdown("**Σύνθεση Triplex / Laminated (έως 4 γυαλιά - Γ2):**")
+                st.markdown("**Σύνθεση Triplex / Laminated:**")
                 g_list, pvb_list, t_list, h_list, s_list, hole_list, rode, name2, has_temp2 = build_laminated_ui("g2", "CLEAR FLOAT GLASS 4 mm")
-                c2 = calculate_lami_component_cost(g_list, pvb_list, t_list, h_list, s_list, hole_list, rode)
+                c2_base, c2_extra, _ = calculate_component_cost(g_list, pvb_list, t_list, h_list, s_list, hole_list, rode)
             else:
                 g2_main = st.selectbox("Επιλογή Βασικού Γυαλιού 2", list(GLASS_DB.keys()), key="g2_main")
                 p2_temp_main = st.checkbox("Security / Tempered ", key="p2_temp_m")
                 p2_hst_main = st.checkbox("Heat Soak Test (HST) ", key="p2_hst_m")
                 p2_silk_main = st.checkbox("Μεταξοτυπία ", key="p2_silk_m")
                 p2_holes_main = st.checkbox("Τρύπες ", key="p2_holes_m")
-                p2_rode = st.checkbox("Ροντέ / Τρόχισμα ", key="p2_rode")
+                
+                p2_rode_lbl = "Ροντέ / Τρόχισμα (Αυτόματα)" if p2_temp_main else "Ροντέ / Τρόχισμα "
+                p2_rode = st.checkbox(p2_rode_lbl, value=p2_temp_main, disabled=p2_temp_main, key="p2_rode")
 
                 name2 = g2_main
                 has_temp2 = p2_temp_main
-                c2 = calculate_lami_component_cost([g2_main], [], [p2_temp_main], [p2_hst_main], [p2_silk_main], [p2_holes_main], p2_rode)
+                c2_base, c2_extra, _ = calculate_component_cost([g2_main], [], [p2_temp_main], [p2_hst_main], [p2_silk_main], [p2_holes_main], p2_rode)
 
     # GLASS 3 CONFIG
-    c3 = 0.0
+    c3_base = 0.0
+    c3_extra = 0.0
     name3 = ""
     has_temp3 = False
 
@@ -733,20 +784,22 @@ with tab1:
             st.subheader("🔴 Εσωτερικός (Γ3)")
             p3_lami = st.checkbox("Είναι Laminated / Συγκολλημένος  ", key="p3_lami")
             if p3_lami:
-                st.markdown("**Σύνθεση Triplex / Laminated (έως 4 γυαλιά - Γ3):**")
+                st.markdown("**Σύνθεση Triplex / Laminated:**")
                 g_list, pvb_list, t_list, h_list, s_list, hole_list, rode, name3, has_temp3 = build_laminated_ui("g3", "CLEAR FLOAT GLASS 4 mm")
-                c3 = calculate_lami_component_cost(g_list, pvb_list, t_list, h_list, s_list, hole_list, rode)
+                c3_base, c3_extra, _ = calculate_component_cost(g_list, pvb_list, t_list, h_list, s_list, hole_list, rode)
             else:
                 g3_main = st.selectbox("Επιλογή Βασικού Γυαλιού 3", list(GLASS_DB.keys()), key="g3_main")
                 p3_temp_main = st.checkbox("Security / Tempered  ", key="p3_temp_m")
                 p3_hst_main = st.checkbox("Heat Soak Test (HST)  ", key="p3_hst_m")
                 p3_silk_main = st.checkbox("Μεταξοτυπία  ", key="p3_silk_m")
                 p3_holes_main = st.checkbox("Τρύπες  ", key="p3_holes_m")
-                p3_rode = st.checkbox("Ροντέ / Τρόχισμα  ", key="p3_rode")
+                
+                p3_rode_lbl = "Ροντέ / Τρόχισμα (Αυτόματα)" if p3_temp_main else "Ροντέ / Τρόχισμα  "
+                p3_rode = st.checkbox(p3_rode_lbl, value=p3_temp_main, disabled=p3_temp_main, key="p3_rode")
 
                 name3 = g3_main
                 has_temp3 = p3_temp_main
-                c3 = calculate_lami_component_cost([g3_main], [], [p3_temp_main], [p3_hst_main], [p3_silk_main], [p3_holes_main], p3_rode)
+                c3_base, c3_extra, _ = calculate_component_cost([g3_main], [], [p3_temp_main], [p3_hst_main], [p3_silk_main], [p3_holes_main], p3_rode)
 
     # SPACERS, STEP & AIR GAPS CONFIG
     total_spacer_cost = 0.0
@@ -762,12 +815,10 @@ with tab1:
         with col_sp2:
             sp1_size = st.selectbox("Πάχος Διάκενου (mm)", [10, 12, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32], index=4, key="sp1_size")
         with col_sp3:
-            add_step = st.checkbox("Επεξεργασία STEP (+€15.00/m²)", key="add_step")
+            add_step = st.checkbox("Επεξεργασία STEP", key="add_step")
 
         key1 = f"{'Technoform' if 'Technoform' in sp1_mat else 'Aluminium'} {'< 18mm' if sp1_size < 18 else '> 18mm'}"
         total_spacer_cost = SPACER_PRICES.get(key1, 10.00)
-        if add_step:
-            total_spacer_cost += PROCESSING_COSTS["step"]
         spacer_desc = f" / {sp1_size}mm {sp1_mat} + Argon"
 
     elif is_triple:
@@ -775,40 +826,44 @@ with tab1:
         st.subheader("🔲 Ρυθμίσεις Δύο Διάκενων / Αποστατών (Spacers) & Step")
         col_sp1, col_sp2, col_sp3 = st.columns(3)
         with col_sp1:
-            st.markdown("**1o Διάκενο (Γ1 - Γ2):**")
             sp1_mat = st.selectbox("Υλικό 1ου Διάκενου", ["Technoform Warm Edge", "Aluminium"], key="sp1_mat_trip")
             sp1_size = st.selectbox("Πάχος 1ου Διάκενου (mm)", [10, 12, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32], index=4, key="sp1_size_trip")
-
         with col_sp2:
-            st.markdown("**2o Διάκενο (Γ2 - Γ3):**")
             sp2_mat = st.selectbox("Υλικό 2ου Διάκενου", ["Technoform Warm Edge", "Aluminium"], key="sp2_mat_trip")
             sp2_size = st.selectbox("Πάχος 2ου Διάκενου (mm)", [10, 12, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32], index=4, key="sp2_size_trip")
-
         with col_sp3:
-            st.markdown("**Ειδικές Επεξεργασίες Σύνθεσης:**")
-            add_step = st.checkbox("Επεξεργασία STEP (+€15.00/m²)", key="add_step_trip")
+            add_step = st.checkbox("Επεξεργασία STEP", key="add_step_trip")
 
         key1 = f"{'Technoform' if 'Technoform' in sp1_mat else 'Aluminium'} {'< 18mm' if sp1_size < 18 else '> 18mm'}"
         key2 = f"{'Technoform' if 'Technoform' in sp2_mat else 'Aluminium'} {'< 18mm' if sp2_size < 18 else '> 18mm'}"
         total_spacer_cost = SPACER_PRICES.get(key1, 10.00) + SPACER_PRICES.get(key2, 10.00)
-        if add_step:
-            total_spacer_cost += PROCESSING_COSTS["step"]
         spacer_desc = f" / {sp1_size}mm {sp1_mat} + Argon"
 
     st.markdown("---")
-    col_opt1, col_opt2 = st.columns(2)
+    col_opt1, col_opt2, col_opt3 = st.columns(3)
     with col_opt1:
-        add_pack = st.checkbox("Προσθήκη Συσκευασίας & Μεταφοράς (+€3.50 / m²)", value=True)
+        add_pack = st.checkbox("Προσθήκη Συσκευασίας & Μεταφοράς", value=True)
     with col_opt2:
+        add_bonding = st.checkbox("Επεξεργασία Bonding (+35€/m² ΜΟΝΟ αν τεμάχιο > 4m²)", key="add_bonding")
+    with col_opt3:
         waste_pct_est = st.number_input("⚠️ Εκτιμώμενη Φθορά Υλικού (%) [Προαιρετικά]", min_value=0.0, max_value=50.0, value=0.0, step=1.0)
 
-    # CALCULATE TOTAL DIRECT COST
-    direct_cost = c1 + c2 + c3 + total_spacer_cost
-    if add_pack: direct_cost += PROCESSING_COSTS["packing_transport"]
-    if waste_pct_est > 0: direct_cost *= (1.0 + (waste_pct_est / 100.0))
+    # --- ΥΠΟΛΟΓΙΣΜΟΣ ΚΟΣΤΟΥΣ (BASE vs FLAT) ---
+    base_direct_cost = c1_base + c2_base + c3_base + total_spacer_cost
+    if add_pack: base_direct_cost += COST_PACK
+    if waste_pct_est > 0: base_direct_cost *= (1.0 + (waste_pct_est / 100.0))
 
-    cost_with_gbe = direct_cost + (direct_cost * gbe_markup)
-    final_price_m2 = cost_with_gbe + (cost_with_gbe * profit_markup)
+    # Προσθέτουμε markups ΜΟΝΟ στο base_direct_cost
+    base_with_gbe = base_direct_cost * (1 + gbe_markup)
+    final_base_m2 = base_with_gbe * (1 + profit_markup)
+
+    # Υπολογισμός Extra Ατόφιων (χωρίς markups)
+    total_flat_extras = c1_extra + c2_extra + c3_extra
+    if add_step:
+        total_flat_extras += FLAT_STEP
+
+    # Τελική βασική τιμή m2 (χωρίς το υποθετικό Bonding που εξαρτάται από μέγεθος)
+    display_price_m2 = final_base_m2 + total_flat_extras
 
     # FORMULATE RECIPE NAME
     full_recipe_name = name1
@@ -819,25 +874,38 @@ with tab1:
 
     if has_temp1 or has_temp2 or has_temp3:
         full_recipe_name += " Tempered"
-
     if add_step:
         full_recipe_name += " [STEP]"
+    if add_bonding:
+        full_recipe_name += " [BONDING]"
 
     st.markdown("---")
     st.markdown(f"### **Σύνθεση:** {full_recipe_name}")
-    st.metric("Τελική Τιμή Πώλησης / m²", f"{final_price_m2:.2f} €")
+    st.metric("Τελική Βασική Τιμή Πώλησης / m²", f"{display_price_m2:.2f} €")
+    if add_bonding:
+        st.info("ℹ️ **Σημείωση:** Το κόστος Bonding (+35€/m²) θα προστεθεί αυτόματα στην 3η καρτέλα, μόνο για τα τεμάχια που υπερβαίνουν τα 4m².")
 
     col_btn_save, col_btn_transfer = st.columns(2)
     
     with col_btn_save:
         if st.button("💾 Αποθήκευση Συνταγής στη Βιβλιοθήκη", use_container_width=True):
-            st.session_state.recipes[full_recipe_name] = round(final_price_m2, 2)
+            st.session_state.recipes[full_recipe_name] = {
+                "base_m2": final_base_m2,
+                "extras_m2": total_flat_extras,
+                "has_bonding": add_bonding,
+                "display": display_price_m2
+            }
             st.session_state.last_recipe_name = full_recipe_name
-            st.success(f"Η συνταγή '{full_recipe_name}' αποθηκεύτηκε με τιμή {final_price_m2:.2f} €/m²!")
+            st.success(f"Η συνταγή αποθηκεύτηκε!")
 
     with col_btn_transfer:
         if st.button("📥 Μεταφορά & Ενημέρωση 3ης Καρτέλας", use_container_width=True):
-            st.session_state.recipes[full_recipe_name] = round(final_price_m2, 2)
+            st.session_state.recipes[full_recipe_name] = {
+                "base_m2": final_base_m2,
+                "extras_m2": total_flat_extras,
+                "has_bonding": add_bonding,
+                "display": display_price_m2
+            }
             st.session_state.last_recipe_name = full_recipe_name
             st.info("Η σύνθεση μεταφέρθηκε επιτυχώς στη Φόρμα Κοστολόγησης!")
 
@@ -847,22 +915,29 @@ with tab1:
 with tab2:
     st.header("📚 Αποθηκευμένες Συνταγές & Τιμοκατάλογος")
     if st.session_state.recipes:
-        df_rec = pd.DataFrame(list(st.session_state.recipes.items()), columns=["Σύνθεση Υαλοστασίου", "Τιμή Πώλησης (€/m²)"])
+        display_data = []
+        for k, v in st.session_state.recipes.items():
+            if isinstance(v, dict):
+                price = v["display"]
+            else:
+                price = v # Legacy support for old numbers
+            display_data.append([k, f"{price:.2f} €"])
+        
+        df_rec = pd.DataFrame(display_data, columns=["Σύνθεση Υαλοστασίου", "Βασική Τιμή (€/m²)"])
         st.dataframe(df_rec, use_container_width=True)
     else:
         st.info("Δεν υπάρχουν ακόμα αποθηκευμένες συνταγές. Δημιουργήστε μία στην 1η καρτέλα.")
 
 # ---------------------------------------------------------
-# TAB 3: OFFER GENERATION, NESTING & VISUAL CUTTING DIAGRAMS
+# TAB 3: OFFER GENERATION, NESTING & PDF
 # ---------------------------------------------------------
 with tab3:
-    st.header("📊 Ακριβής Κοστολόγηση Παραγωγής, Nesting & PDF Προσφορά")
+    st.header("📊 Ακριβής Κοστολόγηση Παραγωγής, Pro Nesting & PDF Προσφορά")
     
     selected_sheet_label = st.selectbox("📐 Επιλέξτε Διάσταση Αρχικού Φύλλου Κοπής (Stock Sheet):", list(STOCK_SHEETS.keys()))
     stock_w, stock_h = STOCK_SHEETS[selected_sheet_label]
 
-    available_recipes = list(st.session_state.recipes.keys()) if st.session_state.recipes else ["CLIMAX SELECT 33.1 / 16mm Technoform Warm Edge + Argon / CLEAR FLOAT GLASS 4 mm Tempered"]
-    
+    available_recipes = list(st.session_state.recipes.keys()) if st.session_state.recipes else ["Παρακαλώ φτιάξτε συνταγή στην 1η Καρτέλα"]
     active_recipe = st.session_state.get('last_recipe_name', available_recipes[0])
     if active_recipe not in available_recipes:
         active_recipe = available_recipes[0]
@@ -901,9 +976,21 @@ with tab3:
         qty = int(q_val) if pd.notna(q_val) else 0
 
         if w > 0 and h > 0 and qty > 0:
-            area_m2 = (w / 1000.0) * (h / 1000.0) * qty
-            unit_price = st.session_state.recipes.get(recipe_full, 165.00)
-            total_price = area_m2 * unit_price
+            area_m2 = (w / 1000.0) * (h / 1000.0)
+            total_area_m2 = area_m2 * qty
+            
+            # Ανάκτηση δεδομένων συνταγής
+            rec_val = st.session_state.recipes.get(recipe_full, {"base_m2": 165.0, "extras_m2": 0.0, "has_bonding": False})
+            if isinstance(rec_val, (float, int)):
+                # Legacy format support
+                unit_price = rec_val
+            else:
+                unit_price = rec_val["base_m2"] + rec_val["extras_m2"]
+                # Δυναμική προσθήκη Bonding +35€ ΜΟΝΟ αν τεμάχιο > 4 m2
+                if rec_val["has_bonding"] and area_m2 > 4.0:
+                    unit_price += FLAT_BONDING
+
+            total_price = total_area_m2 * unit_price
 
             processed_items.append({
                 "Περιγραφή": clean_desc,
@@ -911,7 +998,7 @@ with tab3:
                 "Ύψος (mm)": h,
                 "Τεμάχια": qty,
                 "Τιμή/m² (€)": unit_price,
-                "Σύνολο m²": round(area_m2, 2),
+                "Σύνολο m²": round(total_area_m2, 2),
                 "Σύνολο (€)": round(total_price, 2),
                 "Σημειώσεις": str(row.get("Σημειώσεις", ""))
             })
@@ -920,7 +1007,8 @@ with tab3:
     df_processed = pd.DataFrame(processed_items)
 
     if not df_processed.empty:
-        sheets_needed, waste_pct, total_m2, placed_sheets = run_nesting_optimization_smart_rotation(nesting_items, stock_w, stock_h)
+        # ---- ΝΕΟ PRO GUILLOTINE NESTING ----
+        sheets_needed, waste_pct, total_m2, placed_sheets = run_guillotine_nesting(nesting_items, stock_w, stock_h)
 
         st.subheader("📋 Επισκόπηση Υπολογισμών Παραγγελίας & Nesting Report")
         col_n1, col_n2, col_n3 = st.columns(3)
@@ -930,7 +1018,7 @@ with tab3:
 
         st.dataframe(df_processed, use_container_width=True)
 
-        st.subheader("🎨 Οπτική Διάταξη Κοπών (Smart Rotation Layouts)")
+        st.subheader("🎨 Οπτική Διάταξη Κοπών (Pro Guillotine 2D Packing)")
         for idx, sheet_items in enumerate(placed_sheets):
             img_buf = create_nesting_diagram(sheet_items, idx, stock_w, stock_h)
             st.image(img_buf, caption=f"Διάταξη Φύλλου Κοπής #{idx + 1} ({stock_w} x {stock_h} mm)", use_container_width=True)
