@@ -223,8 +223,9 @@ customer_name = st.sidebar.text_input("Όνομα Project / Πελάτη", "")
 st.sidebar.markdown("---")
 st.sidebar.subheader("⚙️ Δυναμικές Ρυθμίσεις Κοστολόγησης")
 
-gbe_pct = st.sidebar.number_input("Γ.Β.Ε. / Έξοδα (%)", min_value=0.0, max_value=80.0, value=25.0, step=0.5)
-profit_pct = st.sidebar.number_input("Καθαρό Κέρδος (%)", min_value=0.0, max_value=80.0, value=15.0, step=0.5)
+# Αλλαγμένες οι προεπιλεγμένες τιμές σύμφωνα με το αίτημα (28.0 και 16.0)
+gbe_pct = st.sidebar.number_input("Γ.Β.Ε. / Έξοδα (%)", min_value=0.0, max_value=80.0, value=28.0, step=0.5)
+profit_pct = st.sidebar.number_input("Καθαρό Κέρδος (%)", min_value=0.0, max_value=80.0, value=16.0, step=0.5)
 
 gbe_markup = gbe_pct / (100.0 - gbe_pct) if gbe_pct < 100 else 0
 profit_markup = profit_pct / (100.0 - profit_pct) if profit_pct < 100 else 0
