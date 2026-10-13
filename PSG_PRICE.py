@@ -274,7 +274,7 @@ def calculate_component_cost(glasses_list, pvbs_list, temp_list, hst_list, silk_
     return base_cost, extra_cost, any_tempered
 
 # ---------------------------------------------------------
-# INDUSTRIAL OPTIMA-STYLE NESTING (Left Compression + MAXAS)
+# INDUSTRIAL OPTIMA-STYLE NESTING (BAF Global Search + MAXAS)
 # ---------------------------------------------------------
 def run_guillotine_nesting(items, stock_w, stock_h):
     stock_area = (stock_w / 1000.0) * (stock_h / 1000.0)
@@ -286,8 +286,8 @@ def run_guillotine_nesting(items, stock_w, stock_h):
             individual_pieces.append({'id': p_id, 'w': item['w'], 'h': item['h']})
             p_id += 1
 
-    # Ταξινόμηση βάσει ΜΕΓΑΛΥΤΕΡΗΣ ΠΛΕΥΡΑΣ πρώτα (για να στήνει κολώνες) και μετά ΕΜΒΑΔΟΥ
-    individual_pieces.sort(key=lambda p: (max(p['w'], p['h']), p['w']*p['h']), reverse=True)
+    # Ταξινόμηση αυστηρά βάσει ΕΜΒΑΔΟΥ (τα μεγάλα πρώτα) και μετά βάσει μεγαλύτερης πλευράς
+    individual_pieces.sort(key=lambda p: (p['w'] * p['h'], max(p['w'], p['h'])), reverse=True)
 
     sheets = []
     
@@ -300,34 +300,27 @@ def run_guillotine_nesting(items, stock_w, stock_h):
         best_rect_idx = -1
         best_orientation = None
         
-        # Στόχος: Να ελαχιστοποιήσουμε το δεξί όριο (x + width) του κάθε τζαμιού.
-        # Έτσι ο αλγόριθμος πιέζει τα πάντα αριστερά και γυρίζει τα τζάμια κάθετα από μόνος του!
-        best_right_bound = float('inf')
-        best_top_bound = float('inf')
         best_area_fit = float('inf')
+        best_short_side_fit = float('inf')
         
+        # ΠΑΓΚΟΣΜΙΑ ΑΝΑΖΗΤΗΣΗ ΣΕ ΟΛΑ ΤΑ ΦΥΛΛΑ
         for s_idx, sheet in enumerate(sheets):
             for r_idx, fr in enumerate(sheet['free_rects']):
                 for ow, oh in orientations:
                     if ow <= fr['w'] and oh <= fr['h']:
-                        right_bound = fr['x'] + ow
-                        top_bound = fr['y'] + oh
                         area_fit = (fr['w'] * fr['h']) - (ow * oh)
+                        short_side_fit = min(fr['w'] - ow, fr['h'] - oh)
                         
-                        # 1. Πίεση αριστερά (Right Bound)
-                        # 2. Πίεση κάτω (Top Bound)
-                        # 3. Καλύτερη κάλυψη του κενού
-                        if right_bound < best_right_bound or \
-                           (right_bound == best_right_bound and top_bound < best_top_bound) or \
-                           (right_bound == best_right_bound and top_bound == best_top_bound and area_fit < best_area_fit):
-                            best_right_bound = right_bound
-                            best_top_bound = top_bound
+                        # Στόχος: Best Area Fit (χώσε το στην πιο μικρή δυνατή τρύπα)
+                        if area_fit < best_area_fit or (area_fit == best_area_fit and short_side_fit < best_short_side_fit):
                             best_area_fit = area_fit
+                            best_short_side_fit = short_side_fit
                             best_sheet_idx = s_idx
                             best_rect_idx = r_idx
                             best_orientation = (ow, oh)
                             
         if best_sheet_idx != -1:
+            # Τοποθέτηση σε υπάρχον κενό
             sheet = sheets[best_sheet_idx]
             fr = sheet['free_rects'].pop(best_rect_idx)
             ow, oh = best_orientation
@@ -336,17 +329,15 @@ def run_guillotine_nesting(items, stock_w, stock_h):
             w_left = fr['w'] - ow
             h_left = fr['h'] - oh
             
-            # Δοκιμή Οριζόντιας Κοπής
+            # ΜΑΧΑS (Maximal Area Split)
             area_h_right = w_left * oh
             area_h_top = fr['w'] * h_left
             max_area_h = max(area_h_right, area_h_top)
             
-            # Δοκιμή Κάθετης Κοπής
             area_v_right = w_left * fr['h']
             area_v_top = ow * h_left
             max_area_v = max(area_v_right, area_v_top)
             
-            # Επιλέγουμε την κοπή που αφήνει το μεγαλύτερο, ενιαίο καθαρό ρετάλι (MAXAS)
             if max_area_h > max_area_v:
                 r_right = {'x': fr['x'] + ow, 'y': fr['y'], 'w': w_left, 'h': oh}
                 r_top = {'x': fr['x'], 'y': fr['y'] + oh, 'w': fr['w'], 'h': h_left}
@@ -358,14 +349,20 @@ def run_guillotine_nesting(items, stock_w, stock_h):
             if r_top['w'] > 0 and r_top['h'] > 0: sheet['free_rects'].append(r_top)
             
         else:
-            # Άνοιγμα νέου φύλλου: Διαλέγουμε τον προσανατολισμό που αφήνει το μεγαλύτερο πλάτος δεξιά
+            # Άνοιγμα νέου φύλλου, διατηρώντας το μέγιστο καθαρό ρετάλι
             best_new_ow, best_new_oh = orientations[0]
+            best_new_maxas = -1
             for o_w, o_h in orientations:
                 if o_w <= stock_w and o_h <= stock_h:
-                    if o_w < best_new_ow: 
+                    area_h = max((stock_w - o_w) * o_h, stock_w * (stock_h - o_h))
+                    area_v = max((stock_w - o_w) * stock_h, o_w * (stock_h - o_h))
+                    maxas = max(area_h, area_v)
+                    if maxas > best_new_maxas:
+                        best_new_maxas = maxas
                         best_new_ow, best_new_oh = o_w, o_h
             
             ow, oh = best_new_ow, best_new_oh
+            
             new_sheet = {'items': [{'id': p['id'], 'x': 0, 'y': 0, 'w': ow, 'h': oh}], 'free_rects': []}
             
             w_left = stock_w - ow
